@@ -1,5 +1,8 @@
 package scdip
 
+import scdip.PhaseType.{Adjustment, Movement, Retreat}
+import scdip.Season.{Fall, Spring}
+
 import scala.collection.immutable.Seq
 import scala.xml.{Elem, XML}
 import scalaz.Scalaz._
@@ -55,9 +58,12 @@ case class Variant(name: String,
                    supplyCenterInfo: SupplyCenterInfo,
                    initialState: InitialState
                   ) {
+  private val powerMap = powers.foldLeft(Map.empty[String, Power])((m, p) => m.updated(p.name, p))
+
   def worldMap: WorldMap = WorldMap(XML.load(getClass.getResourceAsStream("/std_adjacency.xml")))
 
-  def power(name: String): Option[Power] = powers.find(_.name == name)
+  def power(name: String): Power = powerMap(name)
+
 }
 
 case class Power(name: String, active: Boolean, adjective: String)
@@ -65,3 +71,39 @@ case class Power(name: String, active: Boolean, adjective: String)
 case class MapDefinition(id: String, title: String, URI: String,
                          thumbURI: String, preferredUnitStyle: String)
 
+object Season {
+
+  case object Spring extends Season
+
+  case object Fall extends Season
+
+}
+
+trait Season
+
+object PhaseType {
+
+  case object Movement extends PhaseType
+
+  case object Retreat extends PhaseType
+
+  case object Adjustment extends PhaseType
+
+}
+
+trait PhaseType
+
+case class Phase(year: Int, season: Season, phaseType: PhaseType) {
+  def next: Phase = {
+    phaseType match {
+      case Movement => copy(phaseType = Retreat)
+      case Retreat => season match {
+        case Spring => copy(season = Season.Fall, phaseType = Movement)
+        case Fall => copy(phaseType = Adjustment)
+      }
+      case Adjustment => copy(year = year + 1, season = Spring, phaseType = Movement)
+    }
+  }
+}
+
+case class UnitState(power:Power, unitType: UnitType, location: Location)

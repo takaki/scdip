@@ -31,13 +31,19 @@ object Order {
 
   case class HoldOrder(power: Power, action: HoldAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
 
-  case class MoveOrder(power: Power, action: MoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+  case class MoveOrder(power: Power, action: MoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order {
+    def requireConvoy(worldMap: WorldMap): Boolean = !worldMap.isNeighbour(action.src, action.dst)
+  }
 
   case class SupportHoldOrder(power: Power, action: SupportHoldAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
 
   case class SupportMoveOrder(power: Power, action: SupportMoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
 
   case class ConvoyOrder(power: Power, action: ConvoyAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+
+  case class BuildOrder(power: Power, action: BuildAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+
+  case class RemoveOrder(power: Power, action: RemoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
 
 }
 
@@ -65,6 +71,10 @@ object Action {
 
   case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends Action
 
+  case class BuildAction(unitType: UnitType, src: Location) extends Action
+
+  case class RemoveAction(unitType: UnitType, src: Location) extends Action
+
 }
 
 sealed trait Action {
@@ -82,7 +92,7 @@ case object OrderEvaluateStep1 extends OrderFilter {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val moves = orderState.moves.map(move =>
       if (move.action.unitType == UnitType.Army &&
-        !worldMap.isNeighbour(move.src, move.action.dst) &&
+        move.requireConvoy(worldMap) &&
         !worldMap.canConvoy(move.src.province, move.action.dst.province,
           restrict = orderState.convoys.filter(c => c.action.convoyMove == move.action)
             .map(c => c.src.province))) {
@@ -90,6 +100,32 @@ case object OrderEvaluateStep1 extends OrderFilter {
       } else {
         move
       })
+    val convoys = orderState.convoys.map(convoy =>
+      if (convoy.action.unitType == UnitType.Fleet && orderState.moves.exists(m => convoy.action.convoyMove == m.action)) {
+        convoy
+      } else {
+        convoy.copy(mark = Option("void"))
+      }
+    )
+    orderState.copy(moves = moves, convoys = convoys)
+  }
+}
+
+case object OrderEvaluateStep2 extends OrderFilter {
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+    val moves = orderState.moves.map(move =>
+      if (move.action.unitType == UnitType.Fleet) {
+        if (worldMap.isNeighbour(move.action.src, move.action.dst)) {
+          move
+        } else {
+          move.copy(mark = Option("void"))
+        }
+      } else {
+        move
+      })
+    val suportHolds = orderState.supportHolds.map(s =>
+      s
+    )
     orderState.copy(moves = moves)
   }
 }

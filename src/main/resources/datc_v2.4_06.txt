@@ -62,13 +62,13 @@ PRESTATE_SETPHASE Spring 1901, Movement
 PRESTATE
 	Austria: F Trieste
 	Austria: A Budapest
-	Russia: A Galacia
+	Russia: A Galicia
 	Russia: A Rumania
 ORDERS
 	Austria: F Trieste S A Budapest
 	Austria: A Budapest H
-	Russia: A Galacia-Budapest
-	Russia: A Rumania S A Galacia-Budapest
+	Russia: A Galicia-Budapest
+	Russia: A Rumania S A Galicia-Budapest
 POSTSTATE
 	Austria: F Trieste
 	Russia: A Budapest	# succeeds unless illegal support actually worked
@@ -103,7 +103,7 @@ ORDERS
 	England: A Yorkshire-Yorkshire
 	England: A liverpool supports A Yorkshire-Yorkshire
 	Germany: F london-Yorkshire
-	Germnay: A Wales SUPPORTS F london-yorkshire
+	Germany: A Wales SUPPORTS F london-yorkshire
 POSTSTATE
 	England: A liverpool
 	England: F nth
@@ -259,7 +259,7 @@ END
 
 
 #############################################################
-#	
+#
 # Section 6.B: COASTAL ISSUES
 #
 #############################################################
@@ -354,12 +354,12 @@ ORDERS
 	France: F mao hold
 	Italy: F gol-spain/sc
 POSTSTATE
-	Italy F gol
+	Italy: F gol
 	France: F spain/nc
 	England: F iri
 	England: F mao
 POSTSTATE_DISLODGED
-	France f mao
+	France: f mao
 END
 
 
@@ -1746,8 +1746,8 @@ PRESTATE
 	France:  A Silesia
 	Germany: A Berlin 
 	Germany: F Denmark
-	Germany: F Helgoland Bight
-	Russia:  F Baltic 
+	Germany: F hel
+	Russia:  F bal
 	Russia:  A Prussia
 ORDERS
 	England: F Holland Supports A Ruhr - Kiel
@@ -1757,8 +1757,8 @@ ORDERS
 	France:  A Silesia Supports A Kiel - Berlin
 	Germany: A Berlin - Kiel
 	Germany: F Denmark Supports A Berlin - Kiel
-	Germany: F Helgoland Bight Supports A Berlin - Kiel
-	Russia:  F Baltic Sea Supports A Prussia - Berlin
+	Germany: F hel Supports A Berlin - Kiel
+	Russia:  F bal Supports A Prussia - Berlin
 	Russia:  A Prussia - Berlin
 POSTSTATE_SAME
 END
@@ -2887,53 +2887,53 @@ PRESTATE
 	England: A Norway
 	England: F Denmark
 	England: F Finland
-	France:  F Norwegian Sea
-	France:  F North Sea
+	France:  F nrg
+	France:  F nth
 	Germany: F Skagerrak
 	Russia:  A Sweden
-	Russia:  F Barents Sea
+	Russia:  F bar
 ORDERS
 	England: A Norway - Sweden
 	England: F Denmark Supports A Norway - Sweden
 	England: F Finland Supports A Norway - Sweden
-	France:  F Norwegian Sea - Norway
-	France:  F North Sea Supports F Norwegian Sea - Norway
+	France:  F nrg - Norway
+	France:  F nth Supports F nrg - Norway
 	Germany: F Skagerrak Convoys A Sweden - Norway
 	Russia:  A Sweden - Norway via Convoy
-	Russia:  F Barents Sea Supports A Sweden - Norway
+	Russia:  F bar Supports A Sweden - Norway
 POSTSTATE
 	England: A Sweden
 	England: F Denmark
 	England: F Finland
-	France:  F Norwegian Sea
-	France:  F North Sea
+	France:  F nrg
+	France:  F nth
 	Germany: F Skagerrak
-	Russia:  F Barents Sea
+	Russia:  F bar
 POSTSTATE_DISLODGED
 	# Russia:  A Sweden	 -- this unit is destroyed (not dislodged)
 END
 
 CASE 6.G.15. TEST CASE, BOUNCE AND DISLODGE WITH DOUBLE CONVOY
 PRESTATE
-	England: F North Sea 
+	England: F nth
 	England: A Holland
 	England: A Yorkshire 
 	England: A London
-	France:  F English Channel
+	France:  F eng
 	France:  A Belgium
 ORDERS
-	England: F North Sea Convoys A London - Belgium
+	England: F nth Convoys A London - Belgium
 	England: A Holland Supports A London - Belgium
 	England: A Yorkshire - London
 	England: A London - Belgium via Convoy
-	France:  F English Channel Convoys A Belgium - London
+	France:  F eng Convoys A Belgium - London
 	France:  A Belgium - London via Convoy
 POSTSTATE
-	England: F North Sea 
+	England: F nth
 	England: A Holland
 	England: A Yorkshire 
 	England: A Belgium
-	France:  F English Channel
+	France:  F eng
 POSTSTATE_DISLODGED
 	France:  A Belgium
 END
@@ -2942,27 +2942,27 @@ CASE 6.G.16. TEST CASE, THE TWO UNIT IN ONE AREA BUG, MOVING BY CONVOY
 PRESTATE
 	England: A Norway
 	England: A Denmark
-	England: F Baltic Sea
-	England: F North Sea
+	England: F bal
+	England: F nth
 	Russia:  A Sweden
 	Russia:  F Skagerrak
-	Russia:  F Norwegian Sea
+	Russia:  F nrg
 ORDERS
 	England: A Norway - Sweden
 	England: A Denmark Supports A Norway - Sweden
-	England: F Baltic Sea Supports A Norway - Sweden
-	England: F North Sea - Norway
+	England: F bal Supports A Norway - Sweden
+	England: F nth - Norway
 	Russia:  A Sweden - Norway via Convoy
 	Russia:  F Skagerrak Convoys A Sweden - Norway
-	Russia:  F Norwegian Sea Supports A Sweden - Norway
+	Russia:  F nrg Supports A Sweden - Norway
 POSTSTATE
 	England: A Sweden
 	England: A Denmark
-	England: F Baltic Sea
-	England: F North Sea
+	England: F bal
+	England: F nth
 	Russia:  A Norway
 	Russia:  F Skagerrak
-	Russia:  F Norwegian Sea
+	Russia:  F nrg
 POSTSTATE_DISLODGED
 END
 
@@ -2970,56 +2970,56 @@ CASE 6.G.17. TEST CASE, THE TWO UNIT IN ONE AREA BUG, MOVING OVER LAND
 PRESTATE
 	England: A Norway
 	England: A Denmark
-	England: F Baltic Sea
+	England: F bal
 	England: F Skagerrak
-	England: F North Sea
+	England: F nth
 	Russia:  A Sweden
-	Russia:  F Norwegian
+	Russia:  F nrg
 ORDERS
 	England: A Norway - Sweden via Convoy
 	England: A Denmark Supports A Norway - Sweden
-	England: F Baltic Sea Supports A Norway - Sweden
+	England: F bal Supports A Norway - Sweden
 	England: F Skagerrak Convoys A Norway - Sweden
-	England: F North Sea - Norway
+	England: F nth - Norway
 	Russia:  A Sweden - Norway
-	Russia:  F Norwegian Sea Supports A Sweden - Norway
+	Russia:  F nrg Supports A Sweden - Norway
 POSTSTATE
 	England: A Sweden
 	England: A Denmark
-	England: F Baltic Sea
+	England: F bal
 	England: F Skagerrak
-	England: F North Sea
+	England: F nth
 	Russia:  A Norway
-	Russia:  F Norwegian
+	Russia:  F nrg
 POSTSTATE_DISLODGED
 END
 
 CASE 6.G.18. TEST CASE, THE TWO UNIT IN ONE AREA BUG, WITH DOUBLE CONVOY
 PRESTATE
-	England: F North Sea
+	England: F nth
 	England: A Holland
 	England: A Yorkshire
 	England: A London
 	England: A Ruhr
-	France:  F English Channel
+	France:  F eng
 	France:  A Belgium
 	France:  A Wales
 ORDERS
-	England: F North Sea Convoys A London - Belgium
+	England: F nth Convoys A London - Belgium
 	England: A Holland Supports A London - Belgium
 	England: A Yorkshire - London
 	England: A London - Belgium
 	England: A Ruhr Supports A London - Belgium
-	France:  F English Channel Convoys A Belgium - London
+	France:  F eng Convoys A Belgium - London
 	France:  A Belgium - London
 	France:  A Wales Supports A Belgium - London
 POSTSTATE
-	England: F North Sea
+	England: F nth
 	England: A Holland
 	England: A Yorkshire
 	England: A Belgium
 	England: A Ruhr
-	France:  F English Channel
+	France:  F eng
 	France:  A London
 	France:  A Wales
 POSTSTATE_DISLODGED
@@ -3698,9 +3698,9 @@ PRESTATE
 	France: A pic
 	France: A par
 ORDERS
-	France: Remove gol
-	France: Remove pic
-	France: Remove par
+	France: Remove A gol
+	France: Remove A pic
+	France: Remove A par
 POSTSTATE
 	France: A par
 END

@@ -1,9 +1,9 @@
+package scdip
+
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import scdip.Action.{ConvoyAction, MoveAction}
 import scdip.Order.{ConvoyOrder, MoveOrder}
-import scdip._
 
 import scala.xml.XML
 
@@ -36,6 +36,12 @@ class OrderSpecs extends Specification {
         val os = parseOrders(Seq("England: A lon - nwy", "England: F nth convoys A lon - nwy"))
         val os0 = OrderEvaluateStep1.evaluate(worldMap = worldMap, os)
         os0.moves.head.mark must beNone
+        os0.convoys.head.mark must beNone
+      }
+      "void convoy" >> {
+        val os = parseOrders(Seq("England: F nth convoys A lon - nwy"))
+        val os0 = OrderEvaluateStep1.evaluate(worldMap = worldMap, os)
+        os0.convoys.head.mark must beSome("void")
       }
 
     }

@@ -1,7 +1,8 @@
+package scdip
+
 import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import scdip.VariantList
 
 import scala.xml.XML
 
@@ -20,7 +21,7 @@ class VariantSpecs extends Specification {
       val variant = variants.variant("Standard [No Units]").get
       variant.name === "Standard [No Units]"
       variant.victoryCondition.gameLength === 35
-      val eng = variant.power("England").get
+      val eng = variant.power("England")
       eng.name === "England"
     }
   }
