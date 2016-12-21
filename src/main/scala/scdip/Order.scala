@@ -1,30 +1,6 @@
 package scdip
 
 import scdip.Action._
-import scdip.Order._
-
-object UnitType {
-
-  object Fleet extends UnitType("Fleet") {
-    override def defaultCoast: Coast = Coast.Single
-  }
-
-  object Army extends UnitType("Army") {
-    override def defaultCoast: Coast = Coast.Land
-  }
-
-  def parse(s: String): UnitType = {
-    s match {
-      case "Fleet" => Fleet
-      case "Army " => Army
-      case _ => throw new IllegalArgumentException()
-    }
-  }
-}
-
-abstract sealed case class UnitType(name: String) {
-  def defaultCoast: Coast
-}
 
 
 object Order {
@@ -57,13 +33,29 @@ sealed trait Order {
   def supportCount: Int
 
   def src: Location = action.src
+
+  def result: OrderResult = if (mark.isEmpty) {
+    SuccessResult(power, action)
+  } else {
+    FailureResult(power, action)
+  }
 }
+
+object MovementOrder
+
+object RetreatOrder
+
+object AdjustmentOrder
 
 object Action {
 
   case class HoldAction(unitType: UnitType, src: Location) extends Action
 
-  case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action
+  case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action {
+    override def moveOrigin: Option[Location] = Option(src)
+
+    override def moveTarget: Option[Location] = Option(dst)
+  }
 
   case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action
 
@@ -82,62 +74,39 @@ sealed trait Action {
 
   def src: Location
 
+  def moveOrigin: Option[Location] = None
+
+  def moveTarget: Option[Location] = None
+
 }
 
-trait OrderFilter {
-  def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState
-}
 
-case object OrderEvaluateStep1 extends OrderFilter {
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
-    val moves = orderState.moves.map(move =>
-      if (move.action.unitType == UnitType.Army &&
-        move.requireConvoy(worldMap) &&
-        !worldMap.canConvoy(move.src.province, move.action.dst.province,
-          restrict = orderState.convoys.filter(c => c.action.convoyMove == move.action)
-            .map(c => c.src.province))) {
-        move.copy(mark = Option("no convoy"))
-      } else {
-        move
-      })
-    val convoys = orderState.convoys.map(convoy =>
-      if (convoy.action.unitType == UnitType.Fleet && orderState.moves.exists(m => convoy.action.convoyMove == m.action)) {
-        convoy
-      } else {
-        convoy.copy(mark = Option("void"))
-      }
-    )
-    orderState.copy(moves = moves, convoys = convoys)
+object UnitType {
+
+  def parse(input: String): UnitType = input match {
+    case "(?i)fleet" => Fleet
+    case "(?i)army" => Army
+    case _ => throw new IllegalArgumentException()
   }
-}
 
-case object OrderEvaluateStep2 extends OrderFilter {
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
-    val moves = orderState.moves.map(move =>
-      if (move.action.unitType == UnitType.Fleet) {
-        if (worldMap.isNeighbour(move.action.src, move.action.dst)) {
-          move
-        } else {
-          move.copy(mark = Option("void"))
-        }
-      } else {
-        move
-      })
-    val suportHolds = orderState.supportHolds.map(s =>
-      s
-    )
-    orderState.copy(moves = moves)
+  object Fleet extends UnitType {
+    def name = "Fleet"
+
+    override def defaultCoast: Coast = Coast.Single
   }
+
+  object Army extends UnitType {
+    def name = "Army"
+
+    override def defaultCoast: Coast = Coast.Land
+  }
+
 }
 
-case class OrderState(holds: Seq[HoldOrder] = Seq.empty,
-                      moves: Seq[MoveOrder] = Seq.empty,
-                      supportHolds: Seq[SupportHoldOrder] = Seq.empty,
-                      supportMoves: Seq[SupportMoveOrder] = Seq.empty,
-                      convoys: Seq[ConvoyOrder] = Seq.empty
-                     ) {
-  //  def step2(worldMap: WorldMap): OrderState = {
-  //    val st = moves.map(m => !worldMap.isNeighbour(m.src, m.dst)).foldLeft(mark)((s, m) => s.updated(m, "void"))
-  //    this.copy(mark = st)
-  //  }
+case class GameUnit(power: Power, unitType: UnitType)
+
+sealed trait UnitType {
+  def defaultCoast: Coast
 }
+
+

@@ -13,7 +13,7 @@ class VariantSpecs extends Specification {
     "Standard" >> {
       val standard = variants.variants.head
       standard.name === "Standard"
-      standard.powers.length === 7
+      standard.powerMap.values.toSet.size === 7
       standard.victoryCondition.gameLength === 35
       variants.variants.length === 12
     }

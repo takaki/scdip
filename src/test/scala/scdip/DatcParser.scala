@@ -10,12 +10,12 @@ import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 
 
-case class DatcBodyParser(variant: Variant) extends OrderParserMixin with PhaseParser {
+case class DatcParser(variant: Variant) extends OrderParserMixin with PhaseParser {
   val worldMap: WorldMap = variant.worldMap
 
   override protected val whiteSpace: Regex = "( |\\t|#.*)+".r
 
-  def apply(input: String): Either[String, Any] = parseAll(datc, input) match {
+  def parse(input: String): Either[String, List[Datc]] = parseAll(datc, input) match {
     case Success(data, next) => Right(data)
     case NoSuccess(errorMessage, next) => Left(s"$errorMessage on line ${next.pos.line} on column ${next.pos.column}")
   }
@@ -35,13 +35,13 @@ case class DatcBodyParser(variant: Variant) extends OrderParserMixin with PhaseP
       prePhase ~ owners ~ preSt ~ preD ~ preR ~
       os ~ postSt) =>
       val phase = prePhase.getOrElse(Phase(1901, Spring, Movement))
-      val psomap = owners.toList.flatten.foldLeft(Map.empty[Province, Power])((m, us) => m.updated(us.location.province, us.power))
+      val psomap = owners.toList.flatten.foldLeft(Map.empty[Province, Power])((m, us) => m.updated(us.location.province, us.gameUnit.power))
       val preDis = preD.toList.flatten
       val preRes = preR.toList.flatten
       if (postSt._1.isEmpty && postSt._2.isEmpty) {
-        Datc(t, phase, psomap, preSt, preDis, preRes, os, preSt, Seq.empty)
+        Datc(variant, t, phase, psomap, preSt, preDis, preRes, os, preSt, Seq.empty)
       } else {
-        Datc(t, phase, psomap, preSt, preDis, preRes, os, postSt._1, postSt._2)
+        Datc(variant, t, phase, psomap, preSt, preDis, preRes, os, postSt._1, postSt._2)
       }
   }
 
@@ -49,13 +49,13 @@ case class DatcBodyParser(variant: Variant) extends OrderParserMixin with PhaseP
 
   def prestateResults: Parser[List[OrderResult]] = "PRESTATE_RESULTS" ~> LF ~> rep(result)
 
-  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => OrderResult(f, o) }
+  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => f(o.power, o.action) }
 
-  def flag: Parser[Boolean] = (success | failure) <~ ":"
+  def flag: Parser[(Power, Action) => OrderResult] = (success | failure) <~ ":"
 
-  def success: Parser[Boolean] = "SUCCESS" ^^ { _ => true }
+  def success: Parser[SuccessResult.type] = "SUCCESS" ^^ { _ => SuccessResult }
 
-  def failure: Parser[Boolean] = "FAILURE" ^^ { _ => false }
+  def failure: Parser[FailureResult.type] = "FAILURE" ^^ { _ => FailureResult }
 
   def casename: Parser[String] = "CASE" ~> ".+".r <~ LF ^^ { result => result }
 
@@ -65,7 +65,7 @@ case class DatcBodyParser(variant: Variant) extends OrderParserMixin with PhaseP
 
   def prestate: Parser[List[UnitState]] = "PRESTATE" ~> LF ~> rep(state)
 
-  def state: Parser[UnitState] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitState(p, u, l) }
+  def state: Parser[UnitState] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitState(l, GameUnit(p, u)) }
 
   def orders: Parser[List[Order]] = "ORDERS" ~> rep1(LF) ~> rep(order <~ LF)
 
@@ -78,28 +78,7 @@ case class DatcBodyParser(variant: Variant) extends OrderParserMixin with PhaseP
   def poststateSame: Parser[(List[UnitState], List[UnitState])] = "POSTSTATE_SAME" <~ LF ^^ { result => (List.empty[UnitState], List.empty[UnitState]) }
 }
 
-trait PhaseParser extends RegexParsers {
-
-  def phase: Parser[Phase] = season ~ (year <~ ",") ~ phasetype ^^ { case (s ~ y ~ pt) => Phase(y, s, pt) }
-
-  def season: Parser[Season] = spring | fall
-
-  def spring: Parser[Spring.type] = "Spring" ^^ { _ => Spring }
-
-  def fall: Parser[Fall.type] = "Fall" ^^ { _ => Fall }
-
-  def year: Parser[Int] = """\d\d\d\d""".r ^^ { result => result.toInt }
-
-  def phasetype: Parser[PhaseType] = movement | retreat | adjustment
-
-  def movement: Parser[Movement.type] = "Movement" ^^ { _ => Movement }
-
-  def retreat: Parser[Retreat.type] = "Retreat" ^^ { _ => Retreat }
-
-  def adjustment: Parser[Adjustment.type] = "Adjustment" ^^ { _ => Adjustment }
-}
-
-trait OrderParserMixin extends RegexParsers {
+trait OrderParserMixin extends UnitTypeParser with RegexParsers {
   def variant: Variant
 
   def worldMap: WorldMap
@@ -122,11 +101,6 @@ trait OrderParserMixin extends RegexParsers {
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
-  def unittype: Parser[UnitType] = army | fleet
-
-  def army: Parser[Army.type] = ("A" | "a") ^^ { _ => UnitType.Army }
-
-  def fleet: Parser[Fleet.type] = ("F" | "f") ^^ { _ => UnitType.Fleet }
 
   def location: Parser[Location] = province ~ opt(coast) ^^ { case (p ~ c) => Location(p, c.getOrElse(Coast.Undefined)) }
 
@@ -155,6 +129,16 @@ trait OrderParserMixin extends RegexParsers {
 
   def remove: Parser[RemoveAction] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveAction(ut, l) } // TODO: Army??
 }
+
+trait UnitTypeParser extends RegexParsers {
+
+  def unittype: Parser[UnitType] = army | fleet
+
+  def army: Parser[Army.type] = ("(?i)army" | "A" | "a") ^^ { _ => UnitType.Army }
+
+  def fleet: Parser[Fleet.type] = ("(?i)fleet" | "F" | "f") ^^ { _ => UnitType.Fleet }
+}
+
 
 case class OrderParser(variant: Variant) extends OrderParserMixin {
   val worldMap: WorldMap = variant.worldMap

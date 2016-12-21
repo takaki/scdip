@@ -9,7 +9,7 @@ import scalax.collection.GraphEdge._
 
 object Coast {
 
-  trait ANY_SEA {
+  trait ANY_SEA { // TODO: FIX ME
     def defaultCoast = Single
   }
 
@@ -76,20 +76,18 @@ case class Location(province: Province, coast: Coast) {
 case class WorldMap(elem: Elem) {
   private val provinceNodes: NodeSeq = elem \\ "PROVINCE"
 
-  val provinces: Seq[Province] = provinceNodes.map(e => Province(e \@ "fullname", e \@ "shortname"))
-  private val canonicalProvince: Map[String, Province] = provinceNodes.foldLeft(provinces.foldLeft(
-    TreeMap.empty[String, Province](Ordering.by(_.toLowerCase)))((m, p) =>
-    m.updated(p.shortName, p).updated(p.fullName, p)))((m, e) =>
-    (e \ "UNIQUENAME").map(_ \@ "name").foldLeft(m)((m0, un) =>
-      m0.updated(un, m(e \@ "shortname"))))
+  val provinces: Seq[(Province, Seq[String])] = provinceNodes.map(e => (Province(e \@ "fullname", e \@ "shortname"), (e \ "UNIQUENAME").map(_ \@ "name")))
+  private val provinceMap: Map[String, Province] = provinces.foldLeft(TreeMap.empty[String, Province](Ordering.by(_.toLowerCase))) {
+    case (m, (p, us)) => us.foldLeft(m)((m, u) => m.updated(u, p)).updated(p.shortName, p).updated(p.fullName, p)
+  }
   private val seaProvinces: Seq[Province] = provinceNodes.filter(n =>
     (n \ "ADJACENCY").forall(a => a \@ "type" != "mv")).map(n =>
-    n \@ "shortname").map(name => canonicalProvince(name))
+    n \@ "shortname").map(name => provinceMap(name))
   private val edges: Seq[DiEdge[Location]] = provinceNodes.flatMap(p => (p \ "ADJACENCY").flatMap(ad => {
     (ad \@ "refs").split(" ")
       .map(_.split("-"))
-      .map(a => DiEdge(Location(canonicalProvince(p \@ "shortname"), Coast.parse(ad \@ "type")),
-        Location(canonicalProvince(a(0)), if (a.length == 1) {
+      .map(a => DiEdge(Location(provinceMap(p \@ "shortname"), Coast.parse(ad \@ "type")),
+        Location(provinceMap(a(0)), if (a.length == 1) {
           Coast.parse(ad \@ "type").defaultCoast
         } else {
           Coast.parse(a(1))
@@ -100,13 +98,13 @@ case class WorldMap(elem: Elem) {
   private val graph = Graph.from(edges = edges)
   private val seaGraph: Graph[Location, DiEdge] = Graph.from(edges = seaEdges)
 
-  private def convoyableGraph(existece: Seq[Province]) = Graph.from(edges = edges.filter(e => existece.contains(e.from.province)))
+  private def convoyableGraph(existence: Seq[Province]) = Graph.from(edges = edges.filter(e => existence.contains(e.from.province)))
 
-  def province(shortName: String): Province = canonicalProvince(shortName)
+  def province(shortName: String): Province = provinceMap(shortName)
 
   def location(shortName: String): Location = {
     val s = shortName.split("-", 2)
-    Location(canonicalProvince(s(0)), Coast.parse(s(1)))
+    Location(provinceMap(s(0)), Coast.parse(s(1)))
   }
 
   def isNeighbour(from: Location, to: Location): Boolean = {
