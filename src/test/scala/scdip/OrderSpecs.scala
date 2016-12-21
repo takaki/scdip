@@ -12,7 +12,15 @@ class OrderSpecs extends Specification {
   val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
   val variant = variants.variant("Standard [No Units]").get
   val worldMap = variant.worldMap
-  val parser = OrderParser(variant)
+  val parser = new OrderParser {
+    override def variant: Variant = variants.variant("Standard [No Units]").get
+
+    def apply(input: String): Either[String, Order] = parseAll(order, input) match {
+      case Success(data, next) => Right(data)
+      case NoSuccess(errorMessage, next) => Left(s"$errorMessage on line ${next.pos.line} on column ${next.pos.column}")
+    }
+
+  }
 
   def parseOrders(lines: Seq[String]): OrderState = {
     val orders = lines.map(parser(_).right.get).groupBy(_.getClass)

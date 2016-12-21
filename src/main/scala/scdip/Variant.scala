@@ -112,7 +112,9 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 
 case class UnitState(location: Location, gameUnit: GameUnit)
 
-case class Power(name: String, active: Boolean, adjective: String)
+case class Power(name: String, active: Boolean, adjective: String) {
+  override def toString: String = name
+}
 
 case class MapDefinition(id: String, title: String, URI: String,
                          thumbURI: String, preferredUnitStyle: String)

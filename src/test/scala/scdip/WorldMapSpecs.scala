@@ -4,6 +4,7 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 
+import scala.io.Source
 import scala.xml.XML
 
 @RunWith(classOf[JUnitRunner])

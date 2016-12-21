@@ -11,9 +11,13 @@ import scala.io.Source
 import scala.xml.XML
 
 @RunWith(classOf[JUnitRunner])
-class UnitOrderParserSpecs extends Specification with matcher.ParserMatchers {
+class OrderParserSpecs extends Specification with matcher.ParserMatchers {
+
   private val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
-  override val parsers = OrderParser(variants.variant("Standard [No Units]").get)
+  override val parsers = new OrderParser {
+    override def variant = variants.variant("Standard [No Units]").get
+  }
+
   "UnitOrderParser" >> {
     parsers.order("England: F nth convoys A Yorkshire - yorkshire") must beASuccess
     parsers.order("England: A Yorkshire-Yorkshire") must beASuccess
@@ -28,7 +32,7 @@ class UnitOrderParserSpecs extends Specification with matcher.ParserMatchers {
     parsers.order("England: A liverpool supports A Yorkshire-Yorkshire") must beASuccess
   }
   "check coast" >> {
-    val move = parsers("Russia:  A Galicia-Budapest").right.get.asInstanceOf[MoveOrder]
+    val move = parsers.order("Russia:  A Galicia-Budapest").get.asInstanceOf[MoveOrder]
     move.action.src.coast === Coast.Land
     move.action.dst.coast === Coast.Land
   }
@@ -52,7 +56,11 @@ class DatcParserSpecs extends Specification with matcher.ParserMatchers {
 
   "DatcBodyParser#testcase" >> {
     val txt = Source.fromInputStream(getClass.getResourceAsStream("/datc_v2.4_06.txt")).mkString
-    Fragment.foreach("""CASE.*^END""".r.findAllMatchIn(txt).map(_.toString).toSeq)(t => "parse " + t.split("\n")(0) >> {
+    val l = """(?s)CASE .*?\nEND""".r.findAllMatchIn(txt).map(_.toString).toList
+    "size" in {
+      l must have size be_>=(1)
+    }
+    Fragment.foreach(l)(t => "parse " + t.split("\n")(0) >> {
       parsers.testcase(t) must beASuccess
     })
   }

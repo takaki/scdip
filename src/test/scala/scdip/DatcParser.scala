@@ -10,8 +10,7 @@ import scala.util.matching.Regex
 import scala.util.parsing.combinator._
 
 
-case class DatcParser(variant: Variant) extends OrderParserMixin with PhaseParser {
-  val worldMap: WorldMap = variant.worldMap
+case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   override protected val whiteSpace: Regex = "( |\\t|#.*)+".r
 
@@ -78,10 +77,10 @@ case class DatcParser(variant: Variant) extends OrderParserMixin with PhaseParse
   def poststateSame: Parser[(List[UnitState], List[UnitState])] = "POSTSTATE_SAME" <~ LF ^^ { result => (List.empty[UnitState], List.empty[UnitState]) }
 }
 
-trait OrderParserMixin extends UnitTypeParser with RegexParsers {
+trait OrderParser extends UnitTypeParser with RegexParsers {
   def variant: Variant
 
-  def worldMap: WorldMap
+  val worldMap: WorldMap = variant.worldMap
 
   def order: Parser[Order] = holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder
 
@@ -140,12 +139,3 @@ trait UnitTypeParser extends RegexParsers {
 }
 
 
-case class OrderParser(variant: Variant) extends OrderParserMixin {
-  val worldMap: WorldMap = variant.worldMap
-
-  def apply(input: String): Either[String, Order] = parseAll(order, input) match {
-    case Success(data, next) => Right(data)
-    case NoSuccess(errorMessage, next) => Left(s"$errorMessage on line ${next.pos.line} on column ${next.pos.column}")
-  }
-
-}

@@ -90,13 +90,13 @@ object UnitType {
   }
 
   object Fleet extends UnitType {
-    def name = "Fleet"
+    override def toString: String = "F"
 
     override def defaultCoast: Coast = Coast.Single
   }
 
   object Army extends UnitType {
-    def name = "Army"
+    override def toString: String = "A"
 
     override def defaultCoast: Coast = Coast.Land
   }
