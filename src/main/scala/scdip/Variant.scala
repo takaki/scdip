@@ -110,7 +110,9 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   }
 }
 
-case class UnitState(location: Location, gameUnit: GameUnit)
+case class UnitState(location: Location, gameUnit: GameUnit) {
+//  require(location.coast != Coast.Undefined)
+}
 
 case class Power(name: String, active: Boolean, adjective: String) {
   override def toString: String = name

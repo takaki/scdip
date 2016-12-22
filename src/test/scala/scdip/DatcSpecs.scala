@@ -4,7 +4,7 @@ import org.junit.runner.RunWith
 import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import org.specs2.specification.core.Fragment
+import org.specs2.specification.core.{Fragment, Fragments}
 import scdip.PhaseType.Movement
 
 import scala.io.Source
@@ -20,8 +20,10 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get
-    Fragment.foreach(datcs.take(10))(d => d.title >> {
-      d.runTest
+    Fragments.foreach(datcs.take(10))(d => d.title >> {
+      Fragments.foreach(d.runTest)(t => t._1 >> {
+        t._2.apply()
+      })
     })
   }
 
@@ -45,10 +47,9 @@ case class Datc(variant: Variant,
       val os = OrderState.fromSeq(orders)
       val newOS = Seq(AdjudicatorStep1, AdjudicatorStep2).foldLeft(os)((os, oes) => oes.evaluate(variant.worldMap, os))
       val retreatState = testState.next(newOS.results).asInstanceOf[RetreatState] // TODO: FIXME
-      Seq(retreatState.unitLocation.unitStats.toSet === postState.toSet,
-        retreatState.dislodgeUnits.toSet === dislodged.toSet)
-    }
-    else {
+      Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.toSet === postState.toSet),
+        ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
+    } else {
       throw new RuntimeException("not implemented yet")
     }
   }
