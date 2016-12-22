@@ -53,7 +53,7 @@ case class Variant(name: String,
                    initialState: Seq[(String, String, String, String)]
                   ) {
 
-  def worldMap: WorldMap = WorldMap.fromElem(XML.load(getClass.getResourceAsStream("/std_adjacency.xml"))) // TODO
+  val worldMap: WorldMap = WorldMap.fromElem(XML.load(getClass.getResourceAsStream("/std_adjacency.xml"))) // TODO
 
   def power(name: String): Power = powerMap(name)
 

@@ -2,8 +2,8 @@ package scdip
 
 import scdip.Action._
 import scdip.Order._
-import scdip.PhaseType.{Adjustment, Movement, Retreat}
-import scdip.Season.{Fall, Spring}
+import scdip.PhaseType.Movement
+import scdip.Season.Spring
 import scdip.UnitType.{Army, Fleet}
 
 import scala.util.matching.Regex
@@ -110,7 +110,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   // TODO: via convoy?
   def move: Parser[MoveAction] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t), c.isDefined || t.viaConvoy(worldMap, s, d))
+    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"
@@ -121,7 +121,9 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def supportMove: Parser[SupportMoveAction] = unittype ~ (location <~ support) ~ move ^^ { case (t ~ s ~ m) => SupportMoveAction(t, s.setCoast(t), m) }
 
-  def convoy: Parser[ConvoyAction] = unittype ~ (location <~ ("(?i)convoys".r | "C" | "c")) ~ move ^^ { case (t ~ s ~ m) => ConvoyAction(t, s.setCoast(t), m) }
+  def convoy: Parser[ConvoyAction] = unittype ~ (location <~ ("(?i)convoys".r | "C" | "c")) ~ move ^^ { case (t ~ s ~ m) =>
+    ConvoyAction(t, s.setCoast(t), m)
+  }
 
   def build: Parser[BuildAction] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildAction(ut, l) }
 

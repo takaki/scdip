@@ -89,9 +89,11 @@ case class Province(fullName: String, shortName: String,
 case class Location(province: Province, coast: Coast) {
   override def toString: String = s"$province-$coast"
 
-  def sameProvince(loc: Location): Boolean = this.province == loc.province
+  def ~~(location: Location): Boolean = this.province == location.province
 
-  def ~~(location: Location): Boolean = sameProvince(location)
+  def ~~(province: Province): Boolean = this.province == province
+
+  def ~~:(province: Province): Boolean = this.province == province
 
   def setCoast(unitType: UnitType): Location = {
     if (coast == Coast.Undefined) copy(coast = unitType.defaultCoast) else this
@@ -99,8 +101,10 @@ case class Location(province: Province, coast: Coast) {
 }
 
 
-case class WorldMap(provinceMap: Map[String, Province], es: Seq[(Location, Location)]) {
-  private val diEdges = es.map(e => DiEdge(e._1, e._2))
+case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Location)]) {
+
+
+  private val diEdges = edges.map(e => DiEdge(e._1, e._2))
   private val graph: Graph[Location, DiEdge] = Graph.from(edges = diEdges)
   private val provinces = diEdges.map(de => de.from.province).distinct
 
@@ -144,18 +148,27 @@ case class WorldMap(provinceMap: Map[String, Province], es: Seq[(Location, Locat
     } yield nf.inNeighbors(nt)).getOrElse(false)
   }
 
-  def canConvoy(from: Province, to: Province, restrict: Set[Province] = seaProvinces): Boolean = {
-    // TODO: province or Locatoin??
-    val fromCoast = graph.nodes.filter(n => n.province == from && n.coast.isInstanceOf[SeaCoast]).map(n => DiEdge(Location(n.province, Coast.Land), n.value))
-    val toCoast = graph.nodes.filter(n => n.province == to && n.coast.isInstanceOf[SeaCoast]).map(n => DiEdge(n.value, Location(n.province, Coast.Land)))
-    val fromEdge = diEdges.filter(e => e.from.province == from && e.from.coast.isInstanceOf[SeaCoast])
-    val gSeaPlus = convoyGraph(restrict) ++ fromCoast ++ fromEdge ++ toCoast
-    val path = for {
-      n0 <- gSeaPlus find Location(from, Coast.Land)
-      n1 <- gSeaPlus find Location(to, Coast.Land)
-      path <- n0 pathTo n1
-    } yield path
-    path.isDefined
+  def isReachable(src: Location, dst: Location): Boolean = {
+    diEdges.exists(de => de.from == src && de.to ~~ dst)
+  }
+
+  def canConvoy(from: Province, to: Province, convoys: Set[Province] = seaProvinces): Boolean = {
+    if (coastalProvinces.contains(from) && coastalProvinces.contains(to)) {
+      val fromCoast = graph.nodes.filter(n => n.province == from && n.coast.isSea).map(n => DiEdge(Location(n.province, Coast.Land), n.value))
+      val toCoast = graph.nodes.filter(n => n.province == to && n.coast.isSea).map(n => DiEdge(n.value, Location(n.province, Coast.Land)))
+      val fromEdge = diEdges.filter(e => e.from.province == from && e.from.coast.isSea)
+      val gSeaPlus = convoyGraph(convoys) ++ fromCoast ++ fromEdge ++ toCoast
+      val path = for {
+        n0 <- gSeaPlus find Location(from, Coast.Land)
+        n1 <- gSeaPlus find Location(to, Coast.Land)
+        path <- n0 pathTo n1
+      } yield path
+      path.isDefined
+    } else {
+      false
+    }
+
+
   }
 
 }

@@ -19,7 +19,7 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get
-    Fragments.foreach(datcs.take(10))(d => d.title >> {
+    Fragments.foreach(datcs.take(300))(d => d.title >> {
       Fragments.foreach(d.runTest)(t => t._1 >> {
         t._2.apply()
       })
@@ -49,7 +49,7 @@ case class Datc(variant: Variant,
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.toSet === postState.toSet),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
-      throw new RuntimeException("not implemented yet")
+      Seq(("NOT IMPLEMENTED", () => 1 === 2))
     }
   }
 

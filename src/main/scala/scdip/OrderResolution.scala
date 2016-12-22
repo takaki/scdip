@@ -1,6 +1,7 @@
 package scdip
 
 import scdip.Order._
+import scdip.UnitType.{Army, Fleet}
 
 
 trait OrderAdjudicator {
@@ -10,20 +11,26 @@ trait OrderAdjudicator {
 case object AdjudicatorStep1 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val moves = orderState.moves.map(move =>
-      if (move.action.unitType == UnitType.Army &&
-        move.requireConvoy(worldMap) &&
-        !worldMap.canConvoy(move.src.province, move.action.dst.province,
-          restrict = orderState.convoys.filter(c => c.action.convoyMove == move.action)
-            .map(c => c.src.province).toSet)) {
-        move.copy(mark = Option("no convoy"))
-      } else {
-        move
+      move.action.unitType match {
+        case Army =>
+          if (move.requireConvoy(worldMap) &&
+            !worldMap.canConvoy(move.src.province, move.action.dst.province,
+              convoys = orderState.convoys.filter(c => c.action.convoyMove == move.action)
+                .map(c => c.src.province).toSet)) {
+            move.copy(mark = Option("no convoy"))
+          } else {
+            move
+          }
+        case Fleet => move
       })
     val convoys = orderState.convoys.map(convoy =>
-      if (convoy.action.unitType == UnitType.Fleet && orderState.moves.exists(m => convoy.action.convoyMove == m.action)) {
-        convoy
-      } else {
-        convoy.copy(mark = Option("void"))
+      convoy.action.unitType match {
+        case Army => convoy.copy(mark = Option("void"))
+        case Fleet => if (orderState.moves.exists(m => convoy.action.convoyMove == m.action)) {
+          convoy
+        } else {
+          convoy.copy(mark = Option("void"))
+        }
       }
     )
     orderState.copy(moves = moves, convoys = convoys)
@@ -33,20 +40,35 @@ case object AdjudicatorStep1 extends OrderAdjudicator {
 case object AdjudicatorStep2 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val moves = orderState.moves.map(move =>
-      if (move.action.unitType == UnitType.Fleet) {
-        if (worldMap.isNeighbour(move.action.src, move.action.dst)) {
+      move.action.unitType match {
+        case Army => if (worldMap.canConvoy(move.src.province, move.action.dst.province) ||
+          worldMap.isNeighbour(move.action.src, move.action.dst)) {
           move
         } else {
           move.copy(mark = Option("void"))
         }
-      } else {
-        move
+        case Fleet =>
+          if (worldMap.isNeighbour(move.action.src, move.action.dst)) {
+            move
+          } else {
+            move.copy(mark = Option("void"))
+          }
       })
     val suportHolds = orderState.supportHolds.map(s =>
-      s
-    )
+      if (orderState.notMove.exists(o => (o.src ~~ s.action.src) && worldMap.isReachable(s.src, s.action.src))) {
+        s
+      } else {
+        s.copy(mark = Option("void"))
+      })
+    val supportMoves = orderState.supportMoves.map(s =>
+      if (orderState.moves.exists(m => (s.action.supportMove ~~ m.action) && worldMap.isReachable(s.src, s.action.supportMove.dst))) {
+        s
+      } else {
+        s.copy(mark = Option("void"))
+      })
     orderState.copy(moves = moves)
   }
+
 }
 
 case class OrderState(holds: Seq[HoldOrder] = Seq.empty,
@@ -55,9 +77,14 @@ case class OrderState(holds: Seq[HoldOrder] = Seq.empty,
                       supportMoves: Seq[SupportMoveOrder] = Seq.empty,
                       convoys: Seq[ConvoyOrder] = Seq.empty
                      ) {
+
   def results: Seq[OrderResult] = {
     (holds ++ moves ++ supportHolds ++ supportMoves ++ convoys).map(_.result)
   }
+
+  def allOrders: Seq[Order] = holds ++ moves ++ supportHolds ++ supportMoves ++ convoys
+
+  def notMove: Seq[Order] = holds ++ supportHolds ++ supportMoves ++ convoys
 }
 
 object OrderState {

@@ -51,7 +51,9 @@ object Action {
 
   case class HoldAction(unitType: UnitType, src: Location) extends Action
 
-  case class MoveAction(unitType: UnitType, src: Location, dst: Location, viaConvoy: Boolean) extends Action {
+  case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action {
+    def ~~(action: MoveAction): Boolean = (action.src ~~ src) && (action.dst ~~ dst)
+
     override def moveOrigin: Option[Location] = Option(src)
 
     override def moveTarget: Option[Location] = Option(dst)
@@ -100,9 +102,6 @@ object UnitType {
 
     override def defaultCoast: Coast = Coast.Land
 
-    override def viaConvoy(worldMap: WorldMap, src: Location, dst: Location): Boolean = {
-      worldMap.canConvoy(src.province, dst.province)
-    }
   }
 
 }
@@ -112,8 +111,6 @@ case class GameUnit(power: Power, unitType: UnitType) {
 }
 
 sealed trait UnitType {
-  def viaConvoy(worldMap: WorldMap, src: Location, dst: Location) = false
-
   def defaultCoast: Coast
 }
 
