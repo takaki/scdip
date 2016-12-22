@@ -82,21 +82,21 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   val worldMap: WorldMap = variant.worldMap
 
-  def order: Parser[Order] = holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder
+  def order: Parser[Order] = power ~ (holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder) ^^ { case (p ~ o) => o(p) }
 
-  def holdOrder: Parser[HoldOrder] = power ~ hold ^^ { case (p ~ a) => HoldOrder(p, a) }
+  def holdOrder: Parser[(Power) => HoldOrder] = hold ^^ { a => HoldOrder(_: Power, a) }
 
-  def moveOrder: Parser[MoveOrder] = power ~ move ^^ { case (p ~ a) => MoveOrder(p, a) }
+  def moveOrder: Parser[(Power) => MoveOrder] = move ^^ { a => MoveOrder(_: Power, a) }
 
-  def supportHoldOrder: Parser[SupportHoldOrder] = power ~ supportHold ^^ { case (p ~ a) => SupportHoldOrder(p, a) }
+  def supportHoldOrder: Parser[(Power) => SupportHoldOrder] = supportHold ^^ { a => SupportHoldOrder(_: Power, a) }
 
-  def supportMoveOrder: Parser[SupportMoveOrder] = power ~ supportMove ^^ { case (p ~ a) => SupportMoveOrder(p, a) }
+  def supportMoveOrder: Parser[(Power) => SupportMoveOrder] = supportMove ^^ { a => SupportMoveOrder(_: Power, a) }
 
-  def convoyOrder: Parser[ConvoyOrder] = power ~ convoy ^^ { case (p ~ a) => ConvoyOrder(p, a) }
+  def convoyOrder: Parser[(Power) => ConvoyOrder] = convoy ^^ { a => ConvoyOrder(_: Power, a) }
 
-  def buildOrder: Parser[BuildOrder] = power ~ build ^^ { case (p ~ a) => BuildOrder(p, a) }
+  def buildOrder: Parser[(Power) => BuildOrder] = build ^^ { a => BuildOrder(_: Power, a) }
 
-  def removeOrder(): Parser[RemoveOrder] = power ~ remove ^^ { case (p ~ a) => RemoveOrder(p, a) }
+  def removeOrder(): Parser[(Power) => RemoveOrder] = remove ^^ { a => RemoveOrder(_: Power, a) }
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
@@ -110,7 +110,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   // TODO: via convoy?
   def move: Parser[MoveAction] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t), c.isDefined || t.viaConvoy(worldMap, s,d))
+    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t), c.isDefined || t.viaConvoy(worldMap, s, d))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"
