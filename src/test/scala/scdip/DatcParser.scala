@@ -64,7 +64,7 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def prestate: Parser[List[UnitState]] = "PRESTATE" ~> LF ~> rep(state)
 
-  def state: Parser[UnitState] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitState(l, GameUnit(p, u)) }
+  def state: Parser[UnitState] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitState(l.setCoast(u), GameUnit(p, u)) }
 
   def orders: Parser[List[Order]] = "ORDERS" ~> rep1(LF) ~> rep(order <~ LF)
 
@@ -100,7 +100,6 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
-
   def location: Parser[Location] = province ~ opt(coast) ^^ { case (p ~ c) => Location(p, c.getOrElse(Coast.Undefined)) }
 
   def province: Parser[Province] = "[A-Za-z]+".r ^^ { result => worldMap.province(result) }
@@ -110,8 +109,8 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
   def hold: Parser[HoldAction] = unittype ~ location <~ ("(?i)HOLD".r | "H") ^^ { case (t ~ s) => HoldAction(t, s.setCoast(t)) }
 
   // TODO: via convoy?
-  def move: Parser[MoveAction] = unittype ~ (location <~ "-") ~ location <~ opt(("via" | "by") <~ "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d) => MoveAction(t, s.setCoast(t), d.setCoast(t))
+  def move: Parser[MoveAction] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
+    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t), c.isDefined || t.viaConvoy(worldMap, s,d))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"

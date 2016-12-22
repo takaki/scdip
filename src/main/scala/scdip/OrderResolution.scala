@@ -14,7 +14,7 @@ case object AdjudicatorStep1 extends OrderAdjudicator {
         move.requireConvoy(worldMap) &&
         !worldMap.canConvoy(move.src.province, move.action.dst.province,
           restrict = orderState.convoys.filter(c => c.action.convoyMove == move.action)
-            .map(c => c.src.province))) {
+            .map(c => c.src.province).toSet)) {
         move.copy(mark = Option("no convoy"))
       } else {
         move

@@ -43,8 +43,6 @@ case class VariantList(root: Elem) {
   def variant(name: String): Option[Variant] = variantMap.get(name)
 }
 
-case class InitialState()
-
 case class Variant(name: String,
                    adjacencyURI: String, // TODO: to build WorldMap
                    ruleOptions: Map[String, String],
@@ -55,7 +53,7 @@ case class Variant(name: String,
                    initialState: Seq[(String, String, String, String)]
                   ) {
 
-  def worldMap: WorldMap = WorldMap(XML.load(getClass.getResourceAsStream("/std_adjacency.xml"))) // TODO
+  def worldMap: WorldMap = WorldMap.fromElem(XML.load(getClass.getResourceAsStream("/std_adjacency.xml"))) // TODO
 
   def power(name: String): Power = powerMap(name)
 
@@ -99,6 +97,8 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 
   def updated(unitState: UnitState): UnitLocation = copy(locationUnitMap.updated(unitState.location, unitState.gameUnit))
 
+  def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap - location)
+
   private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
 
   def getUnits(locations: Seq[Location]): Seq[UnitState] = {
@@ -111,7 +111,10 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 }
 
 case class UnitState(location: Location, gameUnit: GameUnit) {
-//  require(location.coast != Coast.Undefined)
+  require(location.coast != Coast.Undefined)
+
+  override def toString: String = s"$gameUnit $location"
+
 }
 
 case class Power(name: String, active: Boolean, adjective: String) {

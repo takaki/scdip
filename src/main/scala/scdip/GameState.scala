@@ -17,7 +17,12 @@ case class MovementState(turn: Turn,
     val origins: Set[Location] = orderResults.flatMap(or => or.run(a => a.moveOrigin)).flatten.toSet
     val dislodgedLocations = targets.diff(origins)
     val dislodgedUnits = unitLocation.getUnits(dislodgedLocations.toSeq)
-    val newUnitLocation = orderResults.foldLeft(unitLocation)((u, or) => or.run(a => a.moveTarget).flatten.fold(u)(l => u.updated(UnitState(l, or.gameUnit))))
+    val clearedUnitLocation = orderResults.foldLeft(unitLocation) {
+      (u, or) => or.run(a => a.moveOrigin).flatten.fold(u)(l => u.clear(l))
+    }
+    val newUnitLocation = orderResults.foldLeft(clearedUnitLocation) {
+      (u, or) => or.run(a => a.moveTarget).flatten.fold(u)(l => u.updated(UnitState(l, or.gameUnit)))
+    }
     RetreatState(turn, supplyCenterInfo, newUnitLocation, dislodgedUnits)
   }
 }

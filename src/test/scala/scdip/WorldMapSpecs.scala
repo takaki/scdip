@@ -4,26 +4,41 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 
-import scala.io.Source
 import scala.xml.XML
 
 @RunWith(classOf[JUnitRunner])
 class WorldMapSpecs extends Specification {
   "WorldMap" >> {
-    val stream = getClass.getResourceAsStream("/std_adjacency.xml")
-    val tree = XML.load(stream)
-    val worldMap = WorldMap(tree)
-    worldMap.provinces must have size 76
-    worldMap.province("London").shortName === "lon"
-    val mosMv = worldMap.location("mos-mv")
-    val ukrMv = worldMap.location("ukr-mv")
-    val lonMv = worldMap.location("lon-mv")
-    worldMap.isNeighbour(mosMv, ukrMv) must beTrue
-    worldMap.isNeighbour(mosMv, lonMv) must beFalse
-    worldMap.canConvoy(worldMap.province("lon"), worldMap.province("nor")) must beTrue
-    worldMap.canConvoy(worldMap.province("lon"), worldMap.province("syr")) must beTrue
-    worldMap.canConvoy(worldMap.province("mos"), worldMap.province("nor")) must beFalse
-    worldMap.canConvoy(worldMap.province("lon"), worldMap.province("lvn")) must beFalse
+    val worldMap = WorldMap.fromElem(XML.load(getClass.getResourceAsStream("/std_adjacency.xml")))
+    "size" >> {
+      worldMap.size === 76
+    }
+    "WorldMap#province" >> {
+      worldMap.province("London").shortName === "lon"
+    }
+    "WorldMap#location" >> {
+      worldMap.location("nth-mv") must throwA[RuntimeException]
+    }
+    "neighbour" >> {
+      val mosMv = worldMap.location("mos-mv")
+      val ukrMv = worldMap.location("ukr-mv")
+      val lonMv = worldMap.location("lon-mv")
+      val nthXc = worldMap.location("nth-xc")
+      worldMap.isNeighbour(mosMv, ukrMv) must beTrue
+      worldMap.isNeighbour(mosMv, lonMv) must beFalse
+      worldMap.isNeighbour(nthXc, lonMv) must beFalse
+    }
+    "convoy" >> {
+      val lon = worldMap.province("lon")
+      val syr = worldMap.province("syr")
+      val mos = worldMap.province("mos")
+      val nor = worldMap.province("nor")
+      val lvn = worldMap.province("lvn")
+      worldMap.canConvoy(lon, nor) must beTrue
+      worldMap.canConvoy(lon, syr) must beTrue
+      worldMap.canConvoy(mos, nor) must beFalse
+      worldMap.canConvoy(lon, lvn) must beTrue
+    }
   }
 
 }

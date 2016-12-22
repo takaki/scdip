@@ -1,10 +1,9 @@
 package scdip
 
 import org.junit.runner.RunWith
-import org.specs2.matcher.MatchResult
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
-import org.specs2.specification.core.{Fragment, Fragments}
+import org.specs2.specification.core.Fragments
 import scdip.PhaseType.Movement
 
 import scala.io.Source
