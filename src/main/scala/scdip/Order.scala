@@ -5,21 +5,60 @@ import scdip.Action._
 
 object Order {
 
-  case class HoldOrder(power: Power, action: HoldAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+  case class HoldOrder(power: Power, action: HoldAction, mark: Option[OrderMark] = Option.empty) extends Order
 
-  case class MoveOrder(power: Power, action: MoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order {
+  case class MoveOrder(power: Power, action: MoveAction, mark: Option[OrderMark] = Option.empty) extends Order {
+    def canConvoy(worldMap: WorldMap, orders: Seq[Order]): Boolean = {
+      worldMap.canConvoy(src.province, action.dst.province,
+        convoys = orders.filter(o => o match {
+          case (c: ConvoyOrder) => c.action.convoyMove == action
+          case _ => false
+        }).map(c => c.src.province).toSet)
+    }
+
     def requireConvoy(worldMap: WorldMap): Boolean = !worldMap.isNeighbour(action.src, action.dst)
   }
 
-  case class SupportHoldOrder(power: Power, action: SupportHoldAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+  case class SupportHoldOrder(power: Power, action: SupportHoldAction, mark: Option[OrderMark] = Option.empty) extends Order {
+    val target: Location = action.supportHold.src
 
-  case class SupportMoveOrder(power: Power, action: SupportMoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+    def canSupport(orders: Seq[Order]): Boolean = {
+      orders.exists {
+        case _: MoveOrder => false
+        case h => action.src ~~ h.src
+      }
+    }
 
-  case class ConvoyOrder(power: Power, action: ConvoyAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, target)
+  }
 
-  case class BuildOrder(power: Power, action: BuildAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+  case class SupportMoveOrder(power: Power, action: SupportMoveAction, mark: Option[OrderMark] = Option.empty) extends Order {
+    val target: Location = action.supportMove.dst
 
-  case class RemoveOrder(power: Power, action: RemoveAction, mark: Option[String] = Option.empty, supportCount: Int = 0) extends Order
+    def canSupport(orders: Seq[Order]): Boolean = {
+      orders.exists {
+        case m: MoveOrder => action.supportMove ~~ m.action
+        case _ => false
+      }
+    }
+
+    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, target)
+
+  }
+
+  case class ConvoyOrder(power: Power, action: ConvoyAction, mark: Option[OrderMark] = Option.empty) extends Order {
+    def findConvoyed(orders: Seq[Order]): Boolean = {
+      orders.exists {
+        case m: MoveOrder => action.convoyMove == m.action
+        case _ => false
+      }
+    }
+
+  }
+
+  case class BuildOrder(power: Power, action: BuildAction, mark: Option[OrderMark] = Option.empty) extends Order
+
+  case class RemoveOrder(power: Power, action: RemoveAction, mark: Option[OrderMark] = Option.empty) extends Order
 
 }
 
@@ -28,9 +67,7 @@ sealed trait Order {
 
   def action: Action
 
-  def mark: Option[String]
-
-  def supportCount: Int
+  def mark: Option[OrderMark]
 
   def src: Location = action.src
 
@@ -41,6 +78,18 @@ sealed trait Order {
   }
 }
 
+object OrderMark {
+
+  case class VoidMark(message: String = "") extends OrderMark
+
+  case class NoConvoy(message: String = "") extends OrderMark
+
+}
+
+sealed trait OrderMark {
+  def message: String
+}
+
 object MovementOrder
 
 object RetreatOrder
@@ -49,7 +98,9 @@ object AdjustmentOrder
 
 object Action {
 
-  case class HoldAction(unitType: UnitType, src: Location) extends Action
+  case class HoldAction(unitType: UnitType, src: Location) extends Action {
+    override def toString: String = s"$unitType $src H"
+  }
 
   case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action {
     def ~~(action: MoveAction): Boolean = (action.src ~~ src) && (action.dst ~~ dst)
@@ -59,9 +110,13 @@ object Action {
     override def moveTarget: Option[Location] = Option(dst)
   }
 
-  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action
+  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action {
+    override def toString: String = s"$unitType $src S $supportHold"
+  }
 
-  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends Action
+  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends Action {
+
+  }
 
   case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends Action
 

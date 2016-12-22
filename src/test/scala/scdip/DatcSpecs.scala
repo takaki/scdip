@@ -43,7 +43,7 @@ case class Datc(variant: Variant,
     if (phase.phaseType == Movement && supplyCenterOwner.isEmpty && preStateDislodged.isEmpty && preStateResult.isEmpty) {
       val iniState = variant.movementState
       val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
-      val os = OrderState.fromSeq(orders)
+      val os = OrderState(orders)
       val newOS = Seq(AdjudicatorStep1, AdjudicatorStep2).foldLeft(os)((os, oes) => oes.evaluate(variant.worldMap, os))
       val retreatState = testState.next(newOS.results).asInstanceOf[RetreatState] // TODO: FIXME
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.toSet === postState.toSet),
