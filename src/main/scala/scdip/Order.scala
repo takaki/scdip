@@ -112,10 +112,6 @@ object Action {
 
   case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action {
     def ~~(action: MoveAction): Boolean = (action.src ~~ src) && (action.dst ~~ dst)
-
-    override def moveOrigin: Option[Location] = Option(src)
-
-    override def moveTarget: Option[Location] = Option(dst)
   }
 
   case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action {
@@ -138,10 +134,6 @@ sealed trait Action {
   def unitType: UnitType
 
   def src: Location
-
-  def moveOrigin: Option[Location] = None // TODO: remove
-
-  def moveTarget: Option[Location] = None // TODO: remove
 
 }
 

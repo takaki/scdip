@@ -1,5 +1,7 @@
 package scdip
 
+import scdip.Action.MoveAction
+
 trait GameState {
   def phaseType: PhaseType
 
@@ -13,15 +15,26 @@ case class MovementState(turn: Turn,
   val phaseType = PhaseType.Movement
 
   override def next(orderResults: Seq[OrderResult]): GameState = {
-    val targets: Set[Location] = orderResults.flatMap(or => or.run(a => a.moveTarget)).flatten.toSet
-    val origins: Set[Location] = orderResults.flatMap(or => or.run(a => a.moveOrigin)).flatten.toSet
-    val dislodgedLocations = targets.diff(origins)
+    val targets: Set[Location] = orderResults.flatMap {
+      case (or) => or.run {
+        case a: MoveAction => Option(a.dst)
+        case _ => None
+      }
+    }.flatten.toSet
+    val origins: Set[Location] = orderResults.flatMap {
+      case (or) => or.run {
+        case a: MoveAction => Option(a.src)
+        case _ => None
+      }
+    }.flatten.toSet
+    val dislodgedLocations = targets -- origins
     val dislodgedUnits = unitLocation.getUnits(dislodgedLocations.toSeq)
-    val clearedUnitLocation = orderResults.foldLeft(unitLocation) {
-      (u, or) => or.run(a => a.moveOrigin).flatten.fold(u)(l => u.clear(l))
-    }
+    val clearedUnitLocation = origins.foldLeft(unitLocation) { (u, or) => u.clear(or) }
     val newUnitLocation = orderResults.foldLeft(clearedUnitLocation) {
-      (u, or) => or.run(a => a.moveTarget).flatten.fold(u)(l => u.updated(UnitState(l, or.gameUnit)))
+      case (u, or) => or.run {
+        case (a: MoveAction) => u.updated(UnitState(a.dst, or.gameUnit))
+        case _ => u
+      }.getOrElse(u)
     }
     RetreatState(turn, supplyCenterInfo, newUnitLocation, dislodgedUnits)
   }
