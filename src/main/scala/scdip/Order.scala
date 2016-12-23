@@ -5,9 +5,9 @@ import scdip.Action._
 
 object Order {
 
-  case class HoldOrder(power: Power, action: HoldAction, mark: Option[OrderMark] = Option.empty) extends Order
+  case class HoldOrder(power: Power, action: HoldAction) extends Order
 
-  case class MoveOrder(power: Power, action: MoveAction, mark: Option[OrderMark] = Option.empty) extends Order {
+  case class MoveOrder(power: Power, action: MoveAction) extends Order {
     def canConvoy(worldMap: WorldMap, orders: Seq[Order]): Boolean = {
       worldMap.canConvoy(src.province, action.dst.province,
         convoys = orders.filter(o => o match {
@@ -16,24 +16,32 @@ object Order {
         }).map(c => c.src.province).toSet)
     }
 
-    def requireConvoy(worldMap: WorldMap): Boolean = !worldMap.isNeighbour(action.src, action.dst)
+    def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(action.src, action.dst)
   }
 
-  case class SupportHoldOrder(power: Power, action: SupportHoldAction, mark: Option[OrderMark] = Option.empty) extends Order {
-    val target: Location = action.supportHold.src
+  trait SupportOrder extends Order {
+    def canSupport(orders: Seq[Order]): Boolean
+
+    def reachSupport(worldMap: WorldMap): Boolean
+
+    def targetAction: Action
+  }
+
+  case class SupportHoldOrder(power: Power, action: SupportHoldAction) extends SupportOrder {
+    val targetAction: HoldAction = action.supportHold
 
     def canSupport(orders: Seq[Order]): Boolean = {
       orders.exists {
         case _: MoveOrder => false
-        case h => action.src ~~ h.src
+        case h => action.supportHold.src ~~ h.src
       }
     }
 
-    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, target)
+    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, action.supportHold.src)
   }
 
-  case class SupportMoveOrder(power: Power, action: SupportMoveAction, mark: Option[OrderMark] = Option.empty) extends Order {
-    val target: Location = action.supportMove.dst
+  case class SupportMoveOrder(power: Power, action: SupportMoveAction) extends SupportOrder {
+    val targetAction: MoveAction = action.supportMove
 
     def canSupport(orders: Seq[Order]): Boolean = {
       orders.exists {
@@ -42,11 +50,11 @@ object Order {
       }
     }
 
-    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, target)
+    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, action.supportMove.dst)
 
   }
 
-  case class ConvoyOrder(power: Power, action: ConvoyAction, mark: Option[OrderMark] = Option.empty) extends Order {
+  case class ConvoyOrder(power: Power, action: ConvoyAction) extends Order {
     def findConvoyed(orders: Seq[Order]): Boolean = {
       orders.exists {
         case m: MoveOrder => action.convoyMove == m.action
@@ -67,15 +75,13 @@ sealed trait Order {
 
   def action: Action
 
-  def mark: Option[OrderMark]
-
   def src: Location = action.src
 
-  def result: OrderResult = if (mark.isEmpty) {
-    SuccessResult(power, action)
-  } else {
-    FailureResult(power, action)
-  }
+  def success = SuccessResult(power, action)
+
+  def failure = FailureResult(power, action)
+
+
 }
 
 object OrderMark {
@@ -110,11 +116,13 @@ object Action {
     override def moveTarget: Option[Location] = Option(dst)
   }
 
-  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action {
+  trait SupportAction extends Action
+
+  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends SupportAction {
     override def toString: String = s"$unitType $src S $supportHold"
   }
 
-  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends Action {
+  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends SupportAction {
 
   }
 

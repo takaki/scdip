@@ -31,33 +31,43 @@ class OrderSpecs extends Specification {
       "fail with no path" >> {
         val os = parseOrders(Seq("England: A lon - ukr"))
         val os0 = AdjudicatorStep1.evaluate(worldMap = worldMap, os)
-        os0.orders.head.mark must beSome(NoConvoy())
+        os0.getMark(os.orders.head) must beSome(NoConvoy())
       }
       "fail with no convoy fleets" >> {
         val os = parseOrders(Seq("England: A lon - nwy"))
         val os0 = AdjudicatorStep1.evaluate(worldMap = worldMap, os)
-        os0.orders.head.mark must beSome(NoConvoy())
+        os0.getMark(os.orders.head) must beSome(NoConvoy())
       }
       "correct convoy" >> {
         val os = parseOrders(Seq("England: A lon - nwy", "England: F nth convoys A lon - nwy"))
         val os0 = AdjudicatorStep1.evaluate(worldMap = worldMap, os)
-        os0.orders.head.mark must beNone
-        os0.orders(1).mark must beNone
+        os0.getMark(os.orders.head) must  beNone
+        os0.getMark(os.orders(1)) must beNone
       }
       "void convoy" >> {
         val os = parseOrders(Seq("England: F nth convoys A lon - nwy"))
         val os0 = AdjudicatorStep1.evaluate(worldMap = worldMap, os)
-        os0.orders.head.mark must beSome(VoidMark())
+        os0.getMark(os.orders.head) must beSome(VoidMark())
       }
     }
     "Adjudicator 2" >> {
+      def adjudicator(os: OrderState) = Seq(AdjudicatorStep1, AdjudicatorStep2).foldLeft(os)((os, oes) => oes.evaluate(variant.worldMap, os))
+
       "support hold" >> {
         val os = parseOrders(Seq("England: A yor H", "England: A lon S A yor"))
-        val os0 = AdjudicatorStep2.evaluate(worldMap = worldMap, os)
-        os0.orders(1).mark must beNone
-        os0.supportCount must havePair(worldMap.province("yor") -> 1)
+        val os0 = adjudicator(os)
+        os0.getMark(os.orders(1)) must beNone
+        os0.supportCount must havePair(os.orders(0).action -> 1)
 
       }
+      "support hold: fail" >> {
+        val os = parseOrders(Seq("England: A lon S A yor"))
+        val os0 = adjudicator(os)
+        println(os0)
+        os0.getMark(os.orders(0)) must beSome
+        os0.supportCount must beEmpty
+      }
+
     }
   }
 }
