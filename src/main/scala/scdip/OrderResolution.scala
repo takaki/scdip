@@ -34,7 +34,7 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val orders = orderState.orders
     val newOrderState = orders.foldLeft(orderState) {
-      case (os, s: SupportOrder) if !s.canSupport(orders) => os.setMark(s, VoidMark("fail canSupport"))
+      case (os, s: SupportOrder) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("fail existsSupportTarget"))
       case (os, s: SupportOrder) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("fail reachSupport"))
       case (os, _) => os
     }
@@ -42,7 +42,14 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
       case x: SupportOrder => newOrderState.getMark(x).isEmpty
       case _ => false
     }.foldLeft(newOrderState) {
-      case (os, s: SupportOrder) => os.addSupportCount(s)
+      case (os, s: SupportHoldOrder) => os.addSupportCount(s)
+      case (os, s: SupportMoveOrder) =>
+        orders.foldLeft(os.addSupportCount(s)) {
+          case (oss, m: MoveOrder) if m.action ~~ s.targetAction && orders.exists(o => o.src == m.action.dst && o.power == m.power) => {
+            oss.addNoHelpList(m, s)
+          }
+          case (oss, _) => oss
+        }
       case (os, _) => os
     }
   }
@@ -51,11 +58,19 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
 
 case class OrderState(orders: Seq[Order],
                       orderMark: Map[Order, OrderMark] = Map.empty,
-                      supportCount: Map[Action, Int] = Map.empty) {
+                      supportCount: Map[Action, Int] = Map.empty,
+                      noHelpList: Map[MoveOrder, Seq[SupportMoveOrder]] = Map.empty
+                     ) {
 
   def results: Seq[OrderResult] = {
     orders.map(o => if (orderMark.get(o).isEmpty) o.success else o.failure)
   }
+
+  def setMark(order: Order, mark: OrderMark): OrderState = {
+    copy(orderMark = orderMark.updated(order, mark))
+  }
+
+  def getMark(order: Order): Option[OrderMark] = orderMark.get(order)
 
   def addSupportCount(supportOrder: SupportOrder): OrderState = {
     copy(supportCount = supportCount.updated(supportOrder.targetAction, supportCount.getOrElse(supportOrder.targetAction, 0) + 1))
@@ -65,11 +80,13 @@ case class OrderState(orders: Seq[Order],
     supportCount.getOrElse(order.action, 0)
   }
 
-  def setMark(order: Order, mark: OrderMark): OrderState = {
-    copy(orderMark = orderMark.updated(order, mark))
+  def addNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
+    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Seq()) :+ supportMoveOrder))
   }
 
-  def getMark(order: Order): Option[OrderMark] = orderMark.get(order)
+  def getNoHelpList(moveOrder: MoveOrder): Seq[SupportMoveOrder] = {
+    noHelpList.get(moveOrder).toSeq.flatten
+  }
 }
 
 

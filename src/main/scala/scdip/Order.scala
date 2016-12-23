@@ -20,7 +20,7 @@ object Order {
   }
 
   trait SupportOrder extends Order {
-    def canSupport(orders: Seq[Order]): Boolean
+    def existsSupportTarget(orders: Seq[Order]): Boolean
 
     def reachSupport(worldMap: WorldMap): Boolean
 
@@ -30,7 +30,7 @@ object Order {
   case class SupportHoldOrder(power: Power, action: SupportHoldAction) extends SupportOrder {
     val targetAction: HoldAction = action.supportHold
 
-    def canSupport(orders: Seq[Order]): Boolean = {
+    def existsSupportTarget(orders: Seq[Order]): Boolean = {
       orders.exists {
         case _: MoveOrder => false
         case h => action.supportHold.src ~~ h.src
@@ -43,7 +43,7 @@ object Order {
   case class SupportMoveOrder(power: Power, action: SupportMoveAction) extends SupportOrder {
     val targetAction: MoveAction = action.supportMove
 
-    def canSupport(orders: Seq[Order]): Boolean = {
+    def existsSupportTarget(orders: Seq[Order]): Boolean = {
       orders.exists {
         case m: MoveOrder => action.supportMove ~~ m.action
         case _ => false
@@ -104,6 +104,8 @@ object AdjustmentOrder
 
 object Action {
 
+
+
   case class HoldAction(unitType: UnitType, src: Location) extends Action {
     override def toString: String = s"$unitType $src H"
   }
@@ -116,13 +118,11 @@ object Action {
     override def moveTarget: Option[Location] = Option(dst)
   }
 
-  trait SupportAction extends Action
-
-  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends SupportAction {
+  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action {
     override def toString: String = s"$unitType $src S $supportHold"
   }
 
-  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends SupportAction {
+  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends Action {
 
   }
 
@@ -139,9 +139,9 @@ sealed trait Action {
 
   def src: Location
 
-  def moveOrigin: Option[Location] = None
+  def moveOrigin: Option[Location] = None // TODO: remove
 
-  def moveTarget: Option[Location] = None
+  def moveTarget: Option[Location] = None // TODO: remove
 
 }
 
