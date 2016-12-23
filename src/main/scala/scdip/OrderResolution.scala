@@ -1,8 +1,16 @@
 package scdip
 
 import scdip.Order._
-import scdip.OrderMark.{NoConvoy, VoidMark}
+import scdip.OrderMark.{CutMark, NoConvoy, VoidMark}
 import scdip.UnitType.{Army, Fleet}
+
+case object OrderResolution {
+  def exec(orderState: OrderState, worldMap: WorldMap): OrderState = {
+    Seq(AdjudicatorStep1,
+      AdjudicatorStep2,
+      AdjudicatorStep3).foldLeft(orderState)((os, oes) => oes.evaluate(worldMap, os))
+  }
+}
 
 
 trait OrderAdjudicator {
@@ -42,12 +50,11 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
       case x: SupportOrder => newOrderState.getMark(x).isEmpty
       case _ => false
     }.foldLeft(newOrderState) {
-      case (os, s: SupportHoldOrder) => os.addSupportCount(s)
+      case (os, s: SupportHoldOrder) => os.incSupportCount(s)
       case (os, s: SupportMoveOrder) =>
-        orders.foldLeft(os.addSupportCount(s)) {
-          case (oss, m: MoveOrder) if m.action ~~ s.targetAction && orders.exists(o => o.src == m.action.dst && o.power == m.power) => {
-            oss.addNoHelpList(m, s)
-          }
+        orders.foldLeft(os.incSupportCount(s)) {
+          case (oss, m: MoveOrder) if m.action ~~ s.targetAction &&
+            orders.exists(o => o.src ~~ m.action.dst && o.power == m.power) => oss.addNoHelpList(m, s)
           case (oss, _) => oss
         }
       case (os, _) => os
@@ -56,10 +63,34 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
 
 }
 
+case object AdjudicatorStep3 extends OrderAdjudicator {
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+    // non-convoyed cutspport
+    val newOS = orderState.orders.foldLeft(orderState) {
+      case (os, m: MoveOrder) if m.isNeighbour(worldMap) => orderState.orders.foldLeft(os) {
+        case (os0, so: SupportHoldOrder) if so.src ~~ m.action.dst &&
+          os.getMark(so).isEmpty &&
+          so.power != m.power => os0.setMark(so, CutMark()).decSupportCount(so)
+        case (os0, so: SupportMoveOrder) if so.src ~~ m.action.dst &&
+          os.getMark(so).isEmpty &&
+          so.power != m.power => os0.setMark(so, CutMark()).decSupportCount(so).delNoHelpList(m, so)
+        case (os0, _) => os0
+      }
+      case (os, _) => os
+    }
+    // TODO: check mark?
+    newOS.copy(combatList = orderState.orders.flatMap {
+      case (m: MoveOrder) => Seq(m.action.src.province, m.action.dst.province)
+      case x => Seq(x.action.src.province)
+    }.toSet)
+  }
+}
+
 case class OrderState(orders: Seq[Order],
                       orderMark: Map[Order, OrderMark] = Map.empty,
                       supportCount: Map[Action, Int] = Map.empty,
-                      noHelpList: Map[MoveOrder, Seq[SupportMoveOrder]] = Map.empty
+                      noHelpList: Map[MoveOrder, Set[SupportMoveOrder]] = Map.empty,
+                      combatList: Set[Province] = Set.empty
                      ) {
 
   def results: Seq[OrderResult] = {
@@ -72,8 +103,12 @@ case class OrderState(orders: Seq[Order],
 
   def getMark(order: Order): Option[OrderMark] = orderMark.get(order)
 
-  def addSupportCount(supportOrder: SupportOrder): OrderState = {
+  def incSupportCount(supportOrder: SupportOrder): OrderState = {
     copy(supportCount = supportCount.updated(supportOrder.targetAction, supportCount.getOrElse(supportOrder.targetAction, 0) + 1))
+  }
+
+  def decSupportCount(supportOrder: SupportOrder): OrderState = {
+    copy(supportCount = supportCount.updated(supportOrder.targetAction, supportCount.getOrElse(supportOrder.targetAction, 0) - 1))
   }
 
   def getSupprtCount(order: Order): Int = {
@@ -81,7 +116,11 @@ case class OrderState(orders: Seq[Order],
   }
 
   def addNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
-    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Seq()) :+ supportMoveOrder))
+    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Set()) + supportMoveOrder))
+  }
+
+  def delNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
+    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Set()) - supportMoveOrder))
   }
 
   def getNoHelpList(moveOrder: MoveOrder): Seq[SupportMoveOrder] = {

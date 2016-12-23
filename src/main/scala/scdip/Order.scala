@@ -90,6 +90,8 @@ object OrderMark {
 
   case class NoConvoy(message: String = "") extends OrderMark
 
+  case class CutMark(message: String = "") extends OrderMark
+
 }
 
 sealed trait OrderMark {
@@ -103,7 +105,6 @@ object RetreatOrder
 object AdjustmentOrder
 
 object Action {
-
 
 
   case class HoldAction(unitType: UnitType, src: Location) extends Action {
