@@ -64,13 +64,14 @@ object Order {
 
   }
 
-  case class BuildOrder(power: Power, action: BuildAction, mark: Option[OrderMark] = Option.empty) extends Order
+  case class BuildOrder(power: Power, action: BuildAction) extends Order
 
-  case class RemoveOrder(power: Power, action: RemoveAction, mark: Option[OrderMark] = Option.empty) extends Order
+  case class RemoveOrder(power: Power, action: RemoveAction) extends Order
 
 }
 
-sealed trait Order {
+
+sealed trait OrderBase {
   def power: Power
 
   def action: Action
@@ -80,23 +81,11 @@ sealed trait Order {
   def success = SuccessResult(power, action)
 
   def failure = FailureResult(power, action)
-
-
 }
 
-object OrderMark {
-
-  case class VoidMark(message: String = "") extends OrderMark
-
-  case class NoConvoy(message: String = "") extends OrderMark
-
-  case class CutMark(message: String = "") extends OrderMark
-
-}
-
-sealed trait OrderMark {
-  def message: String
-}
+sealed trait Order extends OrderBase
+sealed  trait RetreatOrder extends  OrderBase
+sealed trait AdjustmentOrder extends  OrderBase
 
 object MovementOrder
 

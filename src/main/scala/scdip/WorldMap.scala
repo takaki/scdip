@@ -1,7 +1,5 @@
 package scdip
 
-import scdip.Coast.SeaCoast
-
 import scala.collection.immutable.{Seq, TreeMap}
 import scala.xml.{Elem, NodeSeq}
 import scalax.collection.Graph
@@ -10,7 +8,6 @@ import scalax.collection.GraphEdge._
 object Coast {
 
   trait SeaCoast extends Coast {
-    // TODO: FIX ME
     override val defaultCoast = Single
     override val isSea: Boolean = true
   }
@@ -80,8 +77,7 @@ sealed trait Coast {
 }
 
 
-case class Province(fullName: String, shortName: String,
-                    supplyCenter: Boolean = false) {
+case class Province(fullName: String, shortName: String) {
   override def toString: String = shortName
 }
 

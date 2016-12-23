@@ -10,7 +10,7 @@ import scala.xml.XML
 @RunWith(classOf[JUnitRunner])
 class OrderResolutionSpecs extends Specification {
   val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
-  val variant = variants.variant("Standard [No Units]").get
+  val variant: Variant = variants.variant("Standard [No Units]").get
   val parser = new OrderParser {
     override def variant: Variant = variants.variant("Standard [No Units]").get
 
@@ -86,7 +86,18 @@ class OrderResolutionSpecs extends Specification {
         os0.supportCount must havePair(os.orders(0).action -> 1)
         os0.getNoHelpList(os.orders(0).asInstanceOf[MoveOrder]) must have size 1
       }
-
+    }
+    "Adjudicator 3" >> {
+      "support cut" >> {
+        val os = parseOrders(
+          """England: A lon S A yor
+            |England: A yor H
+            |France: A wal - lon""".stripMargin)
+        val os0 = adjudicator(os)
+        os0.getMark(os.orders(0)) must beSome
+        os0.getMark(os.orders(1)) must beNone
+        os0.supportCount must havePair(os.orders(1).action -> 0)
+      }
     }
   }
 }

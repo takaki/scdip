@@ -46,12 +46,9 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
       case (os, s: SupportOrder) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("fail reachSupport"))
       case (os, _) => os
     }
-    newOrderState.orders.filter {
-      case x: SupportOrder => newOrderState.getMark(x).isEmpty
-      case _ => false
-    }.foldLeft(newOrderState) {
-      case (os, s: SupportHoldOrder) => os.incSupportCount(s)
-      case (os, s: SupportMoveOrder) =>
+    newOrderState.orders.foldLeft(newOrderState) {
+      case (os, s: SupportHoldOrder) if newOrderState.getMark(s).isEmpty => os.incSupportCount(s)
+      case (os, s: SupportMoveOrder) if newOrderState.getMark(s).isEmpty =>
         orders.foldLeft(os.incSupportCount(s)) {
           case (oss, m: MoveOrder) if m.action ~~ s.targetAction &&
             orders.exists(o => o.src ~~ m.action.dst && o.power == m.power) => oss.addNoHelpList(m, s)
@@ -65,7 +62,7 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
 
 case object AdjudicatorStep3 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
-    // non-convoyed cutspport
+    // non-convoyed cut support
     val newOS = orderState.orders.foldLeft(orderState) {
       case (os, m: MoveOrder) if m.isNeighbour(worldMap) => orderState.orders.foldLeft(os) {
         case (os0, so: SupportHoldOrder) if so.src ~~ m.action.dst &&
@@ -78,11 +75,17 @@ case object AdjudicatorStep3 extends OrderAdjudicator {
       }
       case (os, _) => os
     }
-    // TODO: check mark?
+    // TODO: check mark no need?
     newOS.copy(combatList = orderState.orders.flatMap {
       case (m: MoveOrder) => Seq(m.action.src.province, m.action.dst.province)
       case x => Seq(x.action.src.province)
     }.toSet)
+  }
+}
+
+case object AdjudicatorStep4 extends OrderAdjudicator {
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+    orderState
   }
 }
 
@@ -137,13 +140,33 @@ trait OrderResult {
   def gameUnit: GameUnit = GameUnit(power, action.unitType)
 
   def run[T](f: Action => T): Option[T]
+
+  def flatRun[T](f: Action => Option[T]): Option[T]
 }
 
 case class SuccessResult(power: Power, action: Action) extends OrderResult {
   override def run[T](f: (Action) => T): Option[T] = Option(f(action))
+
+  override def flatRun[T](f: (Action) => Option[T]): Option[T] = f(action)
 }
 
 case class FailureResult(power: Power, action: Action) extends OrderResult {
   override def run[T](f: (Action) => T): Option[T] = None
+
+  override def flatRun[T](f: (Action) => Option[T]): Option[T] = None
+}
+
+object OrderMark {
+
+  case class VoidMark(message: String = "") extends OrderMark
+
+  case class NoConvoy(message: String = "") extends OrderMark
+
+  case class CutMark(message: String = "") extends OrderMark
+
+}
+
+sealed trait OrderMark {
+  def message: String
 }
 

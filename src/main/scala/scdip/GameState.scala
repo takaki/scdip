@@ -16,17 +16,17 @@ case class MovementState(turn: Turn,
 
   override def next(orderResults: Seq[OrderResult]): GameState = {
     val targets: Set[Location] = orderResults.flatMap {
-      case (or) => or.run {
+      case (or) => or.flatRun {
         case a: MoveAction => Option(a.dst)
         case _ => None
       }
-    }.flatten.toSet
+    }.toSet
     val origins: Set[Location] = orderResults.flatMap {
-      case (or) => or.run {
+      case (or) => or.flatRun {
         case a: MoveAction => Option(a.src)
         case _ => None
       }
-    }.flatten.toSet
+    }.toSet
     val dislodgedLocations = targets -- origins
     val dislodgedUnits = unitLocation.getUnits(dislodgedLocations.toSeq)
     val clearedUnitLocation = origins.foldLeft(unitLocation) { (u, or) => u.clear(or) }
