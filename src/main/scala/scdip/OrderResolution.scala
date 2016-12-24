@@ -23,7 +23,7 @@ case object AdjudicatorStep1 extends OrderAdjudicator {
     orders.foldLeft(orderState) {
       case (os, move: MoveOrder) if move.isNeighbour(worldMap) => os
       case (os, move: MoveOrder) => move.action.unitType match {
-        case Army if move.canConvoy(worldMap, orders) => os
+        case Army if move.canConvoy(worldMap, orders) => os.copy(convoyingArmiesList = os.convoyingArmiesList + move)
         case Army => os.setMark(move, NoConvoy("no convoy path"))
         case Fleet => os.setMark(move, VoidMark("fleet can't jump"))
       }
@@ -41,14 +41,11 @@ case object AdjudicatorStep1 extends OrderAdjudicator {
 case object AdjudicatorStep2 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val orders = orderState.orders
-    val newOrderState = orders.foldLeft(orderState) {
+    orders.foldLeft(orderState) {
       case (os, s: SupportOrder) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("fail existsSupportTarget"))
       case (os, s: SupportOrder) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("fail reachSupport"))
-      case (os, _) => os
-    }
-    newOrderState.orders.foldLeft(newOrderState) {
-      case (os, s: SupportHoldOrder) if newOrderState.getMark(s).isEmpty => os.incSupportCount(s)
-      case (os, s: SupportMoveOrder) if newOrderState.getMark(s).isEmpty =>
+      case (os, s: SupportHoldOrder) => os.incSupportCount(s)
+      case (os, s: SupportMoveOrder) =>
         orders.foldLeft(os.incSupportCount(s)) {
           case (oss, m: MoveOrder) if m.action ~~ s.targetAction &&
             orders.exists(o => o.src ~~ m.action.dst && o.power == m.power) => oss.addNoHelpList(m, s)
@@ -63,24 +60,25 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
 case object AdjudicatorStep3 extends OrderAdjudicator {
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     // non-convoyed cut support
-    val newOS = orderState.orders.foldLeft(orderState) {
-      case (os, m: MoveOrder) if m.isNeighbour(worldMap) => orderState.orders.foldLeft(os) {
-        case (os0, so: SupportHoldOrder) if so.src ~~ m.action.dst &&
-          os.getMark(so).isEmpty &&
-          so.power != m.power => os0.setMark(so, CutMark()).decSupportCount(so)
-        case (os0, so: SupportMoveOrder) if so.src ~~ m.action.dst &&
-          os.getMark(so).isEmpty &&
-          so.power != m.power => os0.setMark(so, CutMark()).decSupportCount(so).delNoHelpList(m, so)
-        case (os0, _) => os0
-      }
+    val orders = orderState.orders
+    val newOS = orderState.orderMatrix.foldLeft(orderState) {
+      case (os, (m: MoveOrder, so: SupportHoldOrder)) if m.isNeighbour(worldMap) &&
+        so.src ~~ m.action.dst &&
+        os.getMark(so).isEmpty &&
+        so.power != m.power => os.setMark(so, CutMark()).decSupportCount(so)
+      case (os, (m: MoveOrder, so: SupportMoveOrder)) if m.isNeighbour(worldMap) &&
+        so.src ~~ m.action.dst &&
+        os.getMark(so).isEmpty &&
+        so.power != m.power => os.setMark(so, CutMark()).decSupportCount(so).delNoHelpList(m, so)
       case (os, _) => os
     }
     // TODO: check mark no need?
-    newOS.copy(combatList = orderState.orders.flatMap {
+    newOS.copy(combats = orderState.orders.flatMap {
       case (m: MoveOrder) => Seq(m.action.src.province, m.action.dst.province)
       case x => Seq(x.action.src.province)
     }.toSet)
   }
+
 }
 
 case object AdjudicatorStep4 extends OrderAdjudicator {
@@ -91,10 +89,18 @@ case object AdjudicatorStep4 extends OrderAdjudicator {
 
 case class OrderState(orders: Seq[Order],
                       orderMark: Map[Order, OrderMark] = Map.empty,
+                      convoyingArmiesList: Set[MoveOrder] = Set.empty,
                       supportCount: Map[Action, Int] = Map.empty,
-                      noHelpList: Map[MoveOrder, Set[SupportMoveOrder]] = Map.empty,
-                      combatList: Set[Province] = Set.empty
-                     ) {
+                      noHelps: Map[MoveOrder, Set[SupportMoveOrder]] = Map.empty,
+                      combats: Set[Province] = Set.empty,
+                      convoyArmies: Set[MoveOrder] = Set.empty,
+                      convoySuccess: Set[MoveOrder] = Set.empty) {
+  def orderMatrix: Seq[(Order, Order)] = {
+    for {
+      x <- orders
+      y <- orders
+    } yield (x, y)
+  }
 
   def results: Seq[OrderResult] = {
     orders.map(o => if (orderMark.get(o).isEmpty) o.success else o.failure)
@@ -119,15 +125,15 @@ case class OrderState(orders: Seq[Order],
   }
 
   def addNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
-    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Set()) + supportMoveOrder))
+    copy(noHelps = noHelps.updated(moveOrder, noHelps.getOrElse(moveOrder, Set()) + supportMoveOrder))
   }
 
   def delNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
-    copy(noHelpList = noHelpList.updated(moveOrder, noHelpList.getOrElse(moveOrder, Set()) - supportMoveOrder))
+    copy(noHelps = noHelps.updated(moveOrder, noHelps.getOrElse(moveOrder, Set()) - supportMoveOrder))
   }
 
   def getNoHelpList(moveOrder: MoveOrder): Seq[SupportMoveOrder] = {
-    noHelpList.get(moveOrder).toSeq.flatten
+    noHelps.get(moveOrder).toSeq.flatten
   }
 }
 
