@@ -4,6 +4,8 @@ import scdip.Order._
 import scdip.OrderMark.{CutMark, NoConvoy, VoidMark}
 import scdip.UnitType.{Army, Fleet}
 
+// ref: http://www.floc.net/dpjudge/?page=Algorithm
+
 case object OrderResolution {
   def exec(orderState: OrderState, worldMap: WorldMap): OrderState = {
     Seq(AdjudicatorStep1,
@@ -18,12 +20,13 @@ trait OrderAdjudicator {
 }
 
 case object AdjudicatorStep1 extends OrderAdjudicator {
+  // Step 1. Mark All Invalid Convoy Orders
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val orders = orderState.orders
     orders.foldLeft(orderState) {
       case (os, move: MoveOrder) if move.isNeighbour(worldMap) => os
       case (os, move: MoveOrder) => move.action.unitType match {
-        case Army if move.canConvoy(worldMap, orders) => os.copy(convoyingArmiesList = os.convoyingArmiesList + move)
+        case Army if move.canConvoy(worldMap, orders) => os.copy(convoyingArmies = os.convoyingArmies + move)
         case Army => os.setMark(move, NoConvoy("no convoy path"))
         case Fleet => os.setMark(move, VoidMark("fleet can't jump"))
       }
@@ -39,6 +42,7 @@ case object AdjudicatorStep1 extends OrderAdjudicator {
 }
 
 case object AdjudicatorStep2 extends OrderAdjudicator {
+  // Step 2. Mark All Invalid Move and Support Orders
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     val orders = orderState.orders
     orders.foldLeft(orderState) {
@@ -58,6 +62,7 @@ case object AdjudicatorStep2 extends OrderAdjudicator {
 }
 
 case object AdjudicatorStep3 extends OrderAdjudicator {
+  //  Step 3. Calculate Initial Combat Strengths
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
     // non-convoyed cut support
     val orders = orderState.orders
@@ -73,33 +78,76 @@ case object AdjudicatorStep3 extends OrderAdjudicator {
       case (os, _) => os
     }
     // TODO: check mark no need?
-    newOS.copy(combats = orderState.orders.flatMap {
-      case (m: MoveOrder) => Seq(m.action.src.province, m.action.dst.province)
-      case x => Seq(x.action.src.province)
+    newOS.copy(combats = orderState.orders.map {
+      case (m: MoveOrder) => m.action.dst.province
+      case x => x.action.src.province
     }.toSet)
   }
 
 }
 
 case object AdjudicatorStep4 extends OrderAdjudicator {
+  // Step 4. Mark Support Cuts Made by Convoyers and Mark Endangered Convoys
+
   override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+    // checkDisruption
+    // combatsの地域の輸送する海軍でサポートカウントが単独で一番高いものが輸送海軍と同国でなければendanger
+    orderState.fold {
+      case (os, o) if o.action.unitType == Fleet && os.combats.contains(o.action.src.province) => os
+    }
+    // no mark convoy cutSupport
+    //
     orderState
   }
 }
 
+case object AdjudicatorStep5 extends OrderAdjudicator {
+  // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
+
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
+}
+
+case object AdjudicatorStep6 extends OrderAdjudicator {
+  //  Step 6. Mark Bounces Caused by Inability to Swap Places
+
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
+}
+
+case object AdjudicatorStep7 extends OrderAdjudicator {
+  // Step 7. Mark Bounces Suffered by Understrength Attackers
+
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
+}
+
+case object AdjudicatorStep8 extends OrderAdjudicator {
+  //  Step 8. Mark Bounces Caused by Inability to Self-Dislodge
+
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
+}
+
+case object AdjudicatorStep9 extends OrderAdjudicator {
+  //  Step 9. Mark Supports Cut By Dislodgements
+  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
+}
+
+
 case class OrderState(orders: Seq[Order],
                       orderMark: Map[Order, OrderMark] = Map.empty,
-                      convoyingArmiesList: Set[MoveOrder] = Set.empty,
                       supportCount: Map[Action, Int] = Map.empty,
                       noHelps: Map[MoveOrder, Set[SupportMoveOrder]] = Map.empty,
                       combats: Set[Province] = Set.empty,
-                      convoyArmies: Set[MoveOrder] = Set.empty,
+                      convoyingArmies: Set[MoveOrder] = Set.empty,
                       convoySuccess: Set[MoveOrder] = Set.empty) {
+
   def orderMatrix: Seq[(Order, Order)] = {
     for {
       x <- orders
       y <- orders
     } yield (x, y)
+  }
+
+  def fold(f: (OrderState, Order) => OrderState): OrderState = {
+    orders.foldLeft(this)(f)
   }
 
   def results: Seq[OrderResult] = {
@@ -124,7 +172,17 @@ case class OrderState(orders: Seq[Order],
     supportCount.getOrElse(order.action, 0)
   }
 
-  def addNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState = {
+  def highestSupportedOrder(province: Province): Option[Order] = {
+    orders.filter {
+      case (m: MoveOrder) => m.action.dst ~~ province
+      case (o) => o.src ~~ province
+    }
+    None // TODO
+  }
+
+
+  def addNoHelpList(moveOrder: MoveOrder, supportMoveOrder: SupportMoveOrder): OrderState
+  = {
     copy(noHelps = noHelps.updated(moveOrder, noHelps.getOrElse(moveOrder, Set()) + supportMoveOrder))
   }
 

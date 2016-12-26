@@ -19,16 +19,15 @@ case class VariantList(root: Elem) {
     MapDefinition(elem \@ "id", elem \@ "title", elem \@ "URI", elem \@ "thumbURI", elem \@ "preferredUnitStyle"))
 
   val variants: Seq[Variant] = (root \ "VARIANT").map(variantElem => {
-    val powerMap: Map[String, Power] = (variantElem \ "POWER").map { elem =>
+    val powerMap: Map[String, Power] = TreeMap.empty[String, Power](Ordering.by(_.toLowerCase)) ++ (variantElem \ "POWER").map { elem =>
       (Power(elem \@ "name", (elem \@ "active").toBoolean, elem \@ "adjective"), Option(elem \@ "altnames").filter(_.nonEmpty))
-    }.foldLeft(TreeMap.empty[String, Power](Ordering.by(_.toLowerCase))) {
-      case (m, (p, alt)) => alt.foldLeft(m)(_.updated(_, p)).updated(p.name, p)
+    }.flatMap {
+      case ((p, alt)) => Seq(p.name -> p) ++ alt.map(_ -> p)
     }
 
     Variant(variantElem \@ "name",
       variantElem \ "MAP" \@ "adjacencyURI",
-      (variantElem \ "RULEOPTION").foldLeft(Map.empty[String, String])((m, elem) =>
-        m.updated(elem \@ "name", elem \@ "value")),
+      (variantElem \ "RULEOPTION").map(elem => elem \@ "name" -> elem \@ "value").toMap,
       powerMap,
       variantElem \ "STARTINGTIME" \@ "turn",
       (variantElem \ "VICTORYCONDITIONS").map(ve => VictoryCondition((ve \ "WINNING_SUPPLY_CENTERS" \@ "value").parseInt.toOption.getOrElse(0),
@@ -38,7 +37,7 @@ case class VariantList(root: Elem) {
       (variantElem \ "SUPPLYCENTER").map(n => (n \@ "province", n \@ "homepower", n \@ "owner")),
       (variantElem \ "INITIALSTATE").map(n => (n \@ "province", n \@ "power", n \@ "unit", n \@ "unitcoast")))
   })
-  private val variantMap = variants.foldLeft(Map.empty[String, Variant])((m, v) => m.updated(v.name, v))
+  private val variantMap = variants.map(v => v.name -> v).toMap
 
   def variant(name: String): Option[Variant] = variantMap.get(name)
 }
@@ -58,26 +57,13 @@ case class Variant(name: String,
   def power(name: String): Power = powerMap(name)
 
   def movementState: MovementState = {
-    val home = supplyCenterInfo.foldLeft(Map.empty[Province, Option[Power]])((m, d) => m.updated(worldMap.province(d._1), if (d._2 == "none") {
-      None
-    } else {
-      Option(power(d._2))
-    }))
-    val owner = supplyCenterInfo.foldLeft(Map.empty[Province, Option[Power]])((m, d) => m.updated(worldMap.province(d._1), if (d._3 == "none") {
-      None
-    } else {
-      Option(power(d._3))
-    }))
-    val map = initialState.foldLeft(Map.empty[Location, GameUnit])((m, d) => {
+    val home = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._2 == "none") None else Option(power(d._2)))).toMap
+    val owner = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._3 == "none") None else Option(power(d._3)))).toMap
+    val map = initialState.map(d => {
       val unitType = UnitType.parse(d._3)
-      val coast = if (d._4.isEmpty) {
-        unitType.defaultCoast
-      } else {
-        Coast.parse(d._4)
-      }
-      val location = Location(worldMap.province(d._1), coast)
-      m.updated(location, GameUnit(power(d._2), unitType))
-    })
+      val coast = if (d._4.isEmpty) unitType.defaultCoast else Coast.parse(d._4)
+      Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
+    }).toMap
 
     MovementState(Phase.parse(startingTime).turn,
       SupplyCenterInfo(home, owner),

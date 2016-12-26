@@ -123,9 +123,7 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   }
 
   private val locationMap: Map[String, Location] = {
-    graph.nodes.map(n => n.value).foldLeft(Map.empty[String, Location]) { (m, l) =>
-      m.updated(l.toString, l)
-    }
+    graph.nodes.map(n => n.value.toString -> n.value).toMap
   }
 
   def size: Int = provinces.size
@@ -173,11 +171,12 @@ object WorldMap {
   def fromElem(elem: Elem): WorldMap = {
     val provinceNodes: NodeSeq = elem \\ "PROVINCE"
 
-    val provinceMap: Map[String, Province] = provinceNodes.map { e =>
-      (Province(e \@ "fullname", e \@ "shortname"), (e \ "UNIQUENAME").map(_ \@ "name"))
-    }.foldLeft(TreeMap.empty[String, Province](Ordering.by(_.toLowerCase))) {
-      case (m, (p, us)) => us.foldLeft(m)((m, u) => m.updated(u, p)).updated(p.shortName, p).updated(p.fullName, p)
-    }
+    val provinceMap: Map[String, Province] = TreeMap.empty[String, Province](Ordering.by(_.toLowerCase)) ++
+      provinceNodes.map { e =>
+        (Province(e \@ "fullname", e \@ "shortname"), (e \ "UNIQUENAME").map(_ \@ "name"))
+      }.flatMap {
+        case ((p, us)) => Seq(p.shortName -> p, p.fullName -> p) ++ us.map(u => u -> p)
+      }
     val edges: Seq[(Location, Location)] =
       provinceNodes.flatMap { p =>
         (p \ "ADJACENCY").flatMap { ad =>

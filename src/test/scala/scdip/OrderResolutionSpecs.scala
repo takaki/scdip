@@ -43,6 +43,7 @@ class OrderResolutionSpecs extends Specification {
         val os0 = adjudicator(os)
         os0.getMark(os.orders.head) must beNone
         os0.getMark(os.orders(1)) must beNone
+        os0.convoyingArmies must have size(1)
       }
       "void convoy" >> {
         val os = parseOrders("England: F nth C A lon - nwy")
