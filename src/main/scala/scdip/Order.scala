@@ -20,6 +20,8 @@ object Order {
   }
 
   trait SupportOrder extends NonMoveOrder {
+    def canSupport(o: Order): Boolean
+
     def existsSupportTarget(orders: Seq[Order]): Boolean
 
     def reachSupport(worldMap: WorldMap): Boolean
@@ -28,6 +30,12 @@ object Order {
   }
 
   case class SupportHoldOrder(power: Power, action: SupportHoldAction) extends SupportOrder {
+
+    override def canSupport(o: Order): Boolean = o match {
+      case nm: NonMoveOrder => targetAction.src ~~ nm.src
+      case _ => false
+    }
+
     val targetAction: HoldAction = action.supportHold
 
     def existsSupportTarget(orders: Seq[Order]): Boolean = {
@@ -38,9 +46,15 @@ object Order {
     }
 
     def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, action.supportHold.src)
+
   }
 
   case class SupportMoveOrder(power: Power, action: SupportMoveAction) extends SupportOrder {
+    override def canSupport(o: Order): Boolean = o match {
+      case m: MoveOrder => targetAction ~~ m.action
+      case _ => false
+    }
+
     val targetAction: MoveAction = action.supportMove
 
     def existsSupportTarget(orders: Seq[Order]): Boolean = {
@@ -100,23 +114,28 @@ object AdjustmentOrder
 object Action {
 
 
-  case class HoldAction(unitType: UnitType, src: Location) extends NoMoveAction {
+  case class HoldAction(unitType: UnitType, src: Location) extends NonMoveAction {
     override def toString: String = s"$unitType $src H"
+
+    def ~~(action: Action): Boolean = action match {
+      case nm: NonMoveAction => src ~~ nm.src
+      case _ => false
+    }
   }
 
   case class MoveAction(unitType: UnitType, src: Location, dst: Location) extends Action {
     def ~~(action: MoveAction): Boolean = (action.src ~~ src) && (action.dst ~~ dst)
   }
 
-  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends NoMoveAction {
+  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends NonMoveAction {
     override def toString: String = s"$unitType $src S $supportHold"
   }
 
-  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends NoMoveAction {
+  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends NonMoveAction {
     override def toHold: HoldAction = HoldAction(unitType, src)
   }
 
-  case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends NoMoveAction {
+  case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends NonMoveAction {
 
   }
 
@@ -126,7 +145,7 @@ object Action {
 
 }
 
-sealed trait NoMoveAction extends Action {
+sealed trait NonMoveAction extends Action {
   def toHold: HoldAction = HoldAction(unitType, src)
 }
 
