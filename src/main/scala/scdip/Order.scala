@@ -5,13 +5,13 @@ import scdip.Action._
 
 object Order {
 
-  case class HoldOrder(power: Power, action: HoldAction) extends Order
+  case class HoldOrder(power: Power, action: HoldAction) extends NonMoveOrder
 
   case class MoveOrder(power: Power, action: MoveAction) extends Order {
     def canConvoy(worldMap: WorldMap, orders: Seq[Order]): Boolean = {
       worldMap.canConvoy(src.province, action.dst.province,
         convoys = orders.filter(o => o match {
-          case (c: ConvoyOrder) => c.action.convoyMove == action
+          case (c: ConvoyOrder) => c.action.convoyMove ~~ action
           case _ => false
         }).map(c => c.src.province).toSet)
     }
@@ -19,7 +19,7 @@ object Order {
     def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(action.src, action.dst)
   }
 
-  trait SupportOrder extends Order {
+  trait SupportOrder extends NonMoveOrder {
     def existsSupportTarget(orders: Seq[Order]): Boolean
 
     def reachSupport(worldMap: WorldMap): Boolean
@@ -54,12 +54,12 @@ object Order {
 
   }
 
-  case class ConvoyOrder(power: Power, action: ConvoyAction) extends Order {
-    def findConvoyed(orders: Seq[Order]): Boolean = {
-      orders.exists {
-        case m: MoveOrder => action.convoyMove == m.action
-        case _ => false
-      }
+  case class ConvoyOrder(power: Power, action: ConvoyAction) extends NonMoveOrder {
+    def findConvoyed(orders: Seq[Order]): Option[MoveOrder] = {
+      orders.flatMap {
+        case m: MoveOrder => Option(m)
+        case _ => None
+      }.find(m => m.action ~~ action.convoyMove)
     }
 
   }
@@ -84,8 +84,12 @@ sealed trait OrderBase {
 }
 
 sealed trait Order extends OrderBase
-sealed  trait RetreatOrder extends  OrderBase
-sealed trait AdjustmentOrder extends  OrderBase
+
+sealed trait NonMoveOrder extends Order
+
+sealed trait RetreatOrder extends OrderBase
+
+sealed trait AdjustmentOrder extends OrderBase
 
 object MovementOrder
 
@@ -96,7 +100,7 @@ object AdjustmentOrder
 object Action {
 
 
-  case class HoldAction(unitType: UnitType, src: Location) extends Action {
+  case class HoldAction(unitType: UnitType, src: Location) extends NoMoveAction {
     override def toString: String = s"$unitType $src H"
   }
 
@@ -104,20 +108,26 @@ object Action {
     def ~~(action: MoveAction): Boolean = (action.src ~~ src) && (action.dst ~~ dst)
   }
 
-  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends Action {
+  case class SupportHoldAction(unitType: UnitType, src: Location, supportHold: HoldAction) extends NoMoveAction {
     override def toString: String = s"$unitType $src S $supportHold"
   }
 
-  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends Action {
-
+  case class SupportMoveAction(unitType: UnitType, src: Location, supportMove: MoveAction) extends NoMoveAction {
+    override def toHold: HoldAction = HoldAction(unitType, src)
   }
 
-  case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends Action
+  case class ConvoyAction(unitType: UnitType, src: Location, convoyMove: MoveAction) extends NoMoveAction {
+
+  }
 
   case class BuildAction(unitType: UnitType, src: Location) extends Action
 
   case class RemoveAction(unitType: UnitType, src: Location) extends Action
 
+}
+
+sealed trait NoMoveAction extends Action {
+  def toHold: HoldAction = HoldAction(unitType, src)
 }
 
 sealed trait Action {

@@ -1,75 +1,59 @@
 package scdip
 
 import scdip.Order._
-import scdip.OrderMark.{CutMark, NoConvoy, VoidMark}
+import scdip.OrderMark.{ConvoyEndangered, CutMark, NoConvoy, VoidMark}
 import scdip.UnitType.{Army, Fleet}
 
 // ref: http://www.floc.net/dpjudge/?page=Algorithm
 
-case object OrderResolution {
-  def exec(orderState: OrderState, worldMap: WorldMap): OrderState = {
-    Seq(AdjudicatorStep1,
-      AdjudicatorStep2,
-      AdjudicatorStep3).foldLeft(orderState)((os, oes) => oes.evaluate(worldMap, os))
+case class OrderResolution(worldMap: WorldMap) {
+  def exec(orderState: OrderState): OrderState = {
+    orderState.evaluate(step1)
+      .evaluate(step2)
+      .evaluate(step3)
   }
-}
 
-
-trait OrderAdjudicator {
-  def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState
-}
-
-case object AdjudicatorStep1 extends OrderAdjudicator {
   // Step 1. Mark All Invalid Convoy Orders
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+  def step1(orderState: OrderState): OrderState = {
     val orders = orderState.orders
     orders.foldLeft(orderState) {
       case (os, move: MoveOrder) if move.isNeighbour(worldMap) => os
       case (os, move: MoveOrder) => move.action.unitType match {
-        case Army if move.canConvoy(worldMap, orders) => os.copy(convoyingArmies = os.convoyingArmies + move)
-        case Army => os.setMark(move, NoConvoy("no convoy path"))
+        case Army => if (move.canConvoy(worldMap, orders)) os else os.setMark(move, NoConvoy("no convoy path"))
         case Fleet => os.setMark(move, VoidMark("fleet can't jump"))
       }
       case (os, convoy: ConvoyOrder) => convoy.action.unitType match {
         case Army => os.setMark(convoy, VoidMark("army can't convoy"))
-        case Fleet if convoy.findConvoyed(orders) => os
-        case Fleet => os.setMark(convoy, VoidMark("no convoy target"))
+        case Fleet => convoy.findConvoyed(orders).fold(os.setMark(convoy, VoidMark("no convoy target")))(m => os.copy(convoyingArmies = os.convoyingArmies + (convoy -> m)))
       }
       case (os, _) => os
     }
   }
 
-}
-
-case object AdjudicatorStep2 extends OrderAdjudicator {
   // Step 2. Mark All Invalid Move and Support Orders
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+  def step2(orderState: OrderState): OrderState = {
     val orders = orderState.orders
-    orders.foldLeft(orderState) {
-      case (os, s: SupportOrder) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("fail existsSupportTarget"))
-      case (os, s: SupportOrder) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("fail reachSupport"))
-      case (os, s: SupportHoldOrder) => os.incSupportCount(s)
-      case (os, s: SupportMoveOrder) =>
-        orders.foldLeft(os.incSupportCount(s)) {
-          case (oss, m: MoveOrder) if m.action ~~ s.targetAction &&
-            orders.exists(o => o.src ~~ m.action.dst && o.power == m.power) => oss.addNoHelpList(m, s)
-          case (oss, _) => oss
-        }
+    orderState.orderMatrix.foldLeft(orderState) {
+      case (os, (s: SupportOrder, _)) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("fail existsSupportTarget"))
+      case (os, (s: SupportOrder, _)) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("fail reachSupport"))
+      case (os, (s: SupportHoldOrder, nm: NonMoveOrder)) if s.targetAction.src ~~ nm.src => os.incSupportCount(s, nm)
+      case (os, (s: SupportMoveOrder, m: MoveOrder)) if s.targetAction ~~ m.action => (if (orders.exists(o => o.src ~~ m.action.dst && o.power == m.power)) {
+        os.addNoHelpList(m, s)
+      } else {
+        os
+      }).incSupportCount(s, m)
       case (os, _) => os
     }
   }
 
-}
-
-case object AdjudicatorStep3 extends OrderAdjudicator {
   //  Step 3. Calculate Initial Combat Strengths
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+  def step3(orderState: OrderState): OrderState = {
     // non-convoyed cut support
     val orders = orderState.orders
     val newOS = orderState.orderMatrix.foldLeft(orderState) {
       case (os, (m: MoveOrder, so: SupportHoldOrder)) if m.isNeighbour(worldMap) &&
         so.src ~~ m.action.dst &&
-        os.getMark(so).isEmpty &&
+        os.getMark(so).isEmpty && //  cut or void
         so.power != m.power => os.setMark(so, CutMark()).decSupportCount(so)
       case (os, (m: MoveOrder, so: SupportMoveOrder)) if m.isNeighbour(worldMap) &&
         so.src ~~ m.action.dst &&
@@ -84,60 +68,43 @@ case object AdjudicatorStep3 extends OrderAdjudicator {
     }.toSet)
   }
 
-}
 
-case object AdjudicatorStep4 extends OrderAdjudicator {
   // Step 4. Mark Support Cuts Made by Convoyers and Mark Endangered Convoys
-
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = {
+  def step4(orderState: OrderState): OrderState = {
     // checkDisruption
-    // combatsの地域の輸送する海軍でサポートカウントが単独で一番高いものが輸送海軍と同国でなければendanger
-    orderState.fold {
-      case (os, o) if o.action.unitType == Fleet && os.combats.contains(o.action.src.province) => os
+    val newOS = orderState.fold {
+      case (os, c: ConvoyOrder) if c.action.unitType == Fleet && os.combats.contains(c.action.src.province) =>
+        os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
+          os.convoyingArmies.get(c).map(m => os.setMark(m, ConvoyEndangered()))
+        } else {
+          None
+        }).getOrElse(os)
+      case (os, _) => os
     }
-    // no mark convoy cutSupport
-    //
-    orderState
+    val newOS2 = newOS.copy(convoySuccess = newOS.convoyingArmies.values.filter(o => newOS.getMark(o).isEmpty).toSet)
+    newOS2
   }
-}
 
-case object AdjudicatorStep5 extends OrderAdjudicator {
   // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
-
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
-}
-
-case object AdjudicatorStep6 extends OrderAdjudicator {
-  //  Step 6. Mark Bounces Caused by Inability to Swap Places
-
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
-}
-
-case object AdjudicatorStep7 extends OrderAdjudicator {
+  // Step 6. Mark Bounces Caused by Inability to Swap Places
   // Step 7. Mark Bounces Suffered by Understrength Attackers
+  // Step 8. Mark Bounces Caused by Inability to Self-Dislodge
+  // Step 9. Mark Supports Cut By Dislodgements
 
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
 }
-
-case object AdjudicatorStep8 extends OrderAdjudicator {
-  //  Step 8. Mark Bounces Caused by Inability to Self-Dislodge
-
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
-}
-
-case object AdjudicatorStep9 extends OrderAdjudicator {
-  //  Step 9. Mark Supports Cut By Dislodgements
-  override def evaluate(worldMap: WorldMap, orderState: OrderState): OrderState = orderState
-}
-
 
 case class OrderState(orders: Seq[Order],
                       orderMark: Map[Order, OrderMark] = Map.empty,
-                      supportCount: Map[Action, Int] = Map.empty,
+                      supportCount: SupportCount = SupportCount(),
                       noHelps: Map[MoveOrder, Set[SupportMoveOrder]] = Map.empty,
                       combats: Set[Province] = Set.empty,
-                      convoyingArmies: Set[MoveOrder] = Set.empty,
+                      convoyingArmies: Map[ConvoyOrder, MoveOrder] = Map.empty,
                       convoySuccess: Set[MoveOrder] = Set.empty) {
+
+  def evaluate(evaluator: OrderState => OrderState): OrderState = {
+    evaluator(this)
+  }
+
 
   def orderMatrix: Seq[(Order, Order)] = {
     for {
@@ -160,24 +127,31 @@ case class OrderState(orders: Seq[Order],
 
   def getMark(order: Order): Option[OrderMark] = orderMark.get(order)
 
-  def incSupportCount(supportOrder: SupportOrder): OrderState = {
-    copy(supportCount = supportCount.updated(supportOrder.targetAction, supportCount.getOrElse(supportOrder.targetAction, 0) + 1))
+  def incSupportCount(supportHoldOrder: SupportHoldOrder, nonMoveOrder: NonMoveOrder): OrderState = {
+    copy(supportCount = supportCount.incSupport(supportHoldOrder, nonMoveOrder))
+  }
+
+  def incSupportCount(supportMoveOrder: SupportMoveOrder, moveOrder: MoveOrder): OrderState = {
+    copy(supportCount = supportCount.incSupport(supportMoveOrder, moveOrder))
   }
 
   def decSupportCount(supportOrder: SupportOrder): OrderState = {
-    copy(supportCount = supportCount.updated(supportOrder.targetAction, supportCount.getOrElse(supportOrder.targetAction, 0) - 1))
+    copy(supportCount = supportCount.decSupport(supportOrder))
   }
 
-  def getSupprtCount(order: Order): Int = {
-    supportCount.getOrElse(order.action, 0)
+  def getSupportCount(order: Order): Int = {
+    supportCount.strength(order)
   }
 
-  def highestSupportedOrder(province: Province): Option[Order] = {
+  def uniqueHighestSupportedOrder(province: Province): Option[Order] = {
     orders.filter {
       case (m: MoveOrder) => m.action.dst ~~ province
       case (o) => o.src ~~ province
+    }.map(o => o -> supportCount.strength(o)).groupBy { case (o, s) => s }.toSeq.sortBy {
+      case (s, o) => s
+    }.reverse.headOption.flatMap {
+      case (o, s) => if (s.size == 1) Option(s.head._1) else None
     }
-    None // TODO
   }
 
 
@@ -195,6 +169,24 @@ case class OrderState(orders: Seq[Order],
   }
 }
 
+case class SupportCount(map: Map[SupportOrder, Order] = Map.empty) {
+  def incSupport(supportMoveOrder: SupportMoveOrder, moveOrder: MoveOrder): SupportCount = {
+    copy(map = map.updated(supportMoveOrder, moveOrder))
+  }
+
+  def incSupport(supportHoldOrder: SupportHoldOrder, nonMoveOrder: NonMoveOrder): SupportCount = {
+    copy(map = map.updated(supportHoldOrder, nonMoveOrder))
+  }
+
+  def decSupport(supportOrder: SupportOrder): SupportCount = {
+    copy(map = map - supportOrder)
+  }
+
+  def strength(order: Order): Int = {
+    map.count { case (k, v) => v == order }
+  }
+
+}
 
 trait OrderResult {
   def power: Power
@@ -228,7 +220,10 @@ object OrderMark {
 
   case class CutMark(message: String = "") extends OrderMark
 
+  case class ConvoyEndangered(message: String = "") extends OrderMark
+
 }
+
 
 sealed trait OrderMark {
   def message: String
