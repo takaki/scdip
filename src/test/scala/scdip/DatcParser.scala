@@ -1,6 +1,5 @@
 package scdip
 
-import scdip.Action._
 import scdip.Order._
 import scdip.PhaseType.Movement
 import scdip.Season.Spring
@@ -48,9 +47,9 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def prestateResults: Parser[List[OrderResult]] = "PRESTATE_RESULTS" ~> LF ~> rep(result)
 
-  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => f(o.power, o.action) }
+  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => f(o.power, o) }
 
-  def flag: Parser[(Power, Action) => OrderResult] = (success | failure) <~ ":"
+  def flag: Parser[(Power, Order) => OrderResult] = (success | failure) <~ ":"
 
   def success: Parser[SuccessResult.type] = "SUCCESS" ^^ { _ => SuccessResult }
 
@@ -84,19 +83,30 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def order: Parser[Order] = power ~ (holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder) ^^ { case (p ~ o) => o(p) }
 
-  def holdOrder: Parser[(Power) => HoldOrder] = hold ^^ { a => HoldOrder(_: Power, a) }
+  def holdOrder: Parser[(Power) => HoldOrder] = unittype ~ location <~ ("(?i)HOLD".r | "H") ^^ { case (t ~ s) => HoldOrder(_: Power, t, s.setCoast(t)) }
 
-  def moveOrder: Parser[(Power) => MoveOrder] = move ^^ { a => MoveOrder(_: Power, a) }
+  def moveOrder: Parser[(Power) => MoveOrder] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
+    case (t ~ s ~ d ~ c) => MoveOrder(_: Power, t, s.setCoast(t), d.setCoast(t))
+  }
 
-  def supportHoldOrder: Parser[(Power) => SupportHoldOrder] = supportHold ^^ { a => SupportHoldOrder(_: Power, a) }
+  def support: Parser[String] = "(?i)SUPPORTS".r | "S"
 
-  def supportMoveOrder: Parser[(Power) => SupportMoveOrder] = supportMove ^^ { a => SupportMoveOrder(_: Power, a) }
+  def supportHoldOrder: Parser[(Power) => SupportHoldOrder] = unittype ~ (location <~ support) ~ unittype ~ location ^^ {
+    case (t ~ s ~ ht ~ hs) => SupportHoldOrder(_: Power, t, s.setCoast(t), ht, hs.setCoast(ht))
+  }
 
-  def convoyOrder: Parser[(Power) => ConvoyOrder] = convoy ^^ { a => ConvoyOrder(_: Power, a) }
+  def supportMoveOrder: Parser[(Power) => SupportMoveOrder] = unittype ~ (location <~ support) ~ unittype ~ (location <~ "-") ~ location ^^ {
+    case (t ~ s ~ u ~ f ~ to) => SupportMoveOrder(_: Power, t, s.setCoast(t), u, f, to)
+  }
 
-  def buildOrder: Parser[(Power) => BuildOrder] = build ^^ { a => BuildOrder(_: Power, a) }
+  // TODO: via convoy?
+  def convoyOrder: Parser[(Power) => ConvoyOrder] = unittype ~ (location <~ ("(?i)convoys".r | "C" | "c")) ~ unittype ~ (location <~ "-") ~ location ^^ {
+    case (t ~ s ~ u ~ f ~ to) => ConvoyOrder(_: Power, t, s.setCoast(t), u, f, to)
+  }
 
-  def removeOrder(): Parser[(Power) => RemoveOrder] = remove ^^ { a => RemoveOrder(_: Power, a) }
+  def buildOrder: Parser[(Power) => BuildOrder] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildOrder(_: Power, ut, l) }
+
+  def removeOrder(): Parser[(Power) => RemoveOrder] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveOrder(_: Power, ut, l) }
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
@@ -106,28 +116,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def coast: Parser[Coast] = (("/" ~> "[a-z]+".r) | ("(" ~> "[a-z]+".r <~ ")")) ^^ { result => Coast.parse(result) }
 
-  def hold: Parser[HoldAction] = unittype ~ location <~ ("(?i)HOLD".r | "H") ^^ { case (t ~ s) => HoldAction(t, s.setCoast(t)) }
 
-  // TODO: via convoy?
-  def move: Parser[MoveAction] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d ~ c) => MoveAction(t, s.setCoast(t), d.setCoast(t))
-  }
-
-  def support: Parser[String] = "(?i)SUPPORTS".r | "S"
-
-  def supportHold: Parser[SupportHoldAction] = unittype ~ (location <~ support) ~ unittype ~ location ^^ {
-    case (t ~ s ~ ht ~ hs) => SupportHoldAction(t, s.setCoast(t), HoldAction(ht, hs.setCoast(ht)))
-  }
-
-  def supportMove: Parser[SupportMoveAction] = unittype ~ (location <~ support) ~ move ^^ { case (t ~ s ~ m) => SupportMoveAction(t, s.setCoast(t), m) }
-
-  def convoy: Parser[ConvoyAction] = unittype ~ (location <~ ("(?i)convoys".r | "C" | "c")) ~ move ^^ { case (t ~ s ~ m) =>
-    ConvoyAction(t, s.setCoast(t), m)
-  }
-
-  def build: Parser[BuildAction] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildAction(ut, l) }
-
-  def remove: Parser[RemoveAction] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveAction(ut, l) } // TODO: Army??
 }
 
 trait UnitTypeParser extends RegexParsers {

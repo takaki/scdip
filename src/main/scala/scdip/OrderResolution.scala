@@ -18,11 +18,11 @@ case class OrderResolution(worldMap: WorldMap) {
     val orders = orderState.orders
     orders.foldLeft(orderState) {
       case (os, move: MoveOrder) if move.isNeighbour(worldMap) => os
-      case (os, move: MoveOrder) => move.action.unitType match {
+      case (os, move: MoveOrder) => move.unitType match {
         case Army => if (move.canConvoy(worldMap, orders)) os else os.setMark(move, NoConvoy("no convoy path"))
         case Fleet => os.setMark(move, VoidMark("fleet can't jump"))
       }
-      case (os, convoy: ConvoyOrder) => convoy.action.unitType match {
+      case (os, convoy: ConvoyOrder) => convoy.unitType match {
         case Army => os.setMark(convoy, VoidMark("army can't convoy"))
         case Fleet => convoy.findConvoyed(orders).fold(os.setMark(convoy, VoidMark("no convoy target"))) { m =>
           os.copy(convoyingArmies = os.convoyingArmies + (convoy -> m))
@@ -39,7 +39,7 @@ case class OrderResolution(worldMap: WorldMap) {
       case (os, (s: SupportOrder, _)) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("not reach support target"))
       case (os, (s: SupportOrder, _)) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("no support target"))
       case (os, (s: SupportHoldOrder, nm: NonMoveOrder)) if s.canSupport(nm) => os.incSupportCount(nm, s)
-      case (os, (s: SupportMoveOrder, m: MoveOrder)) if s.canSupport(m) => (if (orders.exists(o => o.src ~~ m.action.dst && o.power == m.power)) {
+      case (os, (s: SupportMoveOrder, m: MoveOrder)) if s.canSupport(m) => (if (orders.exists(o => o.src ~~ m.dst && o.power == m.power)) {
         os.addNoHelpList(m, s)
       } else {
         os
@@ -60,17 +60,17 @@ case class OrderResolution(worldMap: WorldMap) {
         case _ => None
       }
     } yield (m, so)).foldLeft(orderState) {
-      case (os, (m, so: SupportHoldOrder)) if so.src ~~ m.action.dst &&
+      case (os, (m, so: SupportHoldOrder)) if so.src ~~ m.dst &&
         os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
         so.power != m.power => os.setMark(so, CutMark()).decSupportCount(so)
-      case (os, (m, so: SupportMoveOrder)) if so.src ~~ m.action.dst &&
+      case (os, (m, so: SupportMoveOrder)) if so.src ~~ m.dst &&
         os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
         so.power != m.power => os.setMark(so, CutMark()).decSupportCount(so).delNoHelpList(m, so)
       case (os, _) => os
     }.copy(combats = orderState.orders.map {
       // TODO: check mark no need?
-      case (m: MoveOrder) => m.action.dst.province
-      case x => x.action.src.province
+      case (m: MoveOrder) => m.dst.province
+      case x => x.src.province
     }.toSet)
   }
 
@@ -78,7 +78,7 @@ case class OrderResolution(worldMap: WorldMap) {
   def step4(orderState: OrderState): OrderState = {
     // checkDisruption
     val newOS = orderState.convoyingArmies.keys.foldLeft(orderState) {
-      case (os, c) if os.combats.contains(c.action.src.province) =>
+      case (os, c) if os.combats.contains(c.src.province) =>
         os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
           os.convoyingArmies.get(c).map(m => os.setMark(m, ConvoyEndangered()))
         } else {
@@ -94,7 +94,7 @@ case class OrderResolution(worldMap: WorldMap) {
       }
     } yield
       (m, s)).foldLeft(orderState) {
-      case (os, (m, so: SupportHoldOrder)) if m.action.dst ~~ so.src &&
+      case (os, (m, so: SupportHoldOrder)) if m.dst ~~ so.src &&
         os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
         so.power != m.power &&
         os.supportCount.target(so).fold(true) {
@@ -102,7 +102,7 @@ case class OrderResolution(worldMap: WorldMap) {
           case _ => true
         } => os.setMark(so, CutMark())
       case (os, (m, so: SupportMoveOrder))
-        if m.action.dst ~~ so.src &&
+        if m.dst ~~ so.src &&
           os.getMark(so).fold(false)(m => m.isInstanceOf[VoidMark] || m.isInstanceOf[CutMark]) &&
           so.power != m.power &&
           os.supportCount.target(so).fold(true) {
@@ -172,7 +172,7 @@ case class OrderState(orders: Seq[Order],
 
   def uniqueHighestSupportedOrder(province: Province): Option[Order] = {
     orders.filter {
-      case (m: MoveOrder) => m.action.dst ~~ province
+      case (m: MoveOrder) => m.dst ~~ province
       case (o) => o.src ~~ province
     }.map(o => o -> supportCount.strength(o)).groupBy { case (o, s) => s }.toSeq.sortBy {
       case (s, o) => s
@@ -220,25 +220,25 @@ case class SupportCount(map: Map[SupportOrder, Order] = Map.empty) {
 trait OrderResult {
   def power: Power
 
-  def action: Action
+  def order: OrderBase
 
-  def gameUnit: GameUnit = GameUnit(power, action.unitType)
+  def gameUnit: GameUnit = GameUnit(power, order.unitType)
 
-  def run[T](f: Action => T): Option[T]
+  def run[T](f: OrderBase => T): Option[T]
 
-  def flatRun[T](f: Action => Option[T]): Option[T]
+  def flatRun[T](f: OrderBase => Option[T]): Option[T]
 }
 
-case class SuccessResult(power: Power, action: Action) extends OrderResult {
-  override def run[T](f: (Action) => T): Option[T] = Option(f(action))
+case class SuccessResult(power: Power, order: OrderBase) extends OrderResult {
+  override def run[T](f: (OrderBase) => T): Option[T] = Option(f(order))
 
-  override def flatRun[T](f: (Action) => Option[T]): Option[T] = f(action)
+  override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = f(order)
 }
 
-case class FailureResult(power: Power, action: Action) extends OrderResult {
-  override def run[T](f: (Action) => T): Option[T] = None
+case class FailureResult(power: Power, order: OrderBase) extends OrderResult {
+  override def run[T](f: (OrderBase) => T): Option[T] = None
 
-  override def flatRun[T](f: (Action) => Option[T]): Option[T] = None
+  override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = None
 }
 
 object OrderMark {

@@ -33,8 +33,8 @@ class OrderParserSpecs extends Specification with matcher.ParserMatchers {
   }
   "check coast" >> {
     val move = parsers.order("Russia:  A Galicia-Budapest").get.asInstanceOf[MoveOrder]
-    move.action.src.coast === Coast.Land
-    move.action.dst.coast === Coast.Land
+    move.src.coast === Coast.Land
+    move.dst.coast === Coast.Land
   }
 }
 

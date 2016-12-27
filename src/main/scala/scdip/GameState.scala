@@ -1,6 +1,6 @@
 package scdip
 
-import scdip.Action.MoveAction
+import scdip.Order.MoveOrder
 
 trait GameState {
   def phaseType: PhaseType
@@ -17,13 +17,13 @@ case class MovementState(turn: Turn,
   override def next(orderResults: Seq[OrderResult]): GameState = {
     val targets: Set[Location] = orderResults.flatMap {
       case (or) => or.flatRun {
-        case a: MoveAction => Option(a.dst)
+        case a: MoveOrder => Option(a.dst)
         case _ => None
       }
     }.toSet
     val origins: Set[Location] = orderResults.flatMap {
       case (or) => or.flatRun {
-        case a: MoveAction => Option(a.src)
+        case a: MoveOrder => Option(a.src)
         case _ => None
       }
     }.toSet
@@ -32,7 +32,7 @@ case class MovementState(turn: Turn,
     val clearedUnitLocation = origins.foldLeft(unitLocation) { (u, or) => u.clear(or) }
     val newUnitLocation = orderResults.foldLeft(clearedUnitLocation) {
       case (u, or) => or.run {
-        case (a: MoveAction) => u.updated(UnitState(a.dst, or.gameUnit))
+        case (a: MoveOrder) => u.updated(UnitState(a.dst, or.gameUnit))
         case _ => u
       }.getOrElse(u)
     }
