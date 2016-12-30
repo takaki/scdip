@@ -4,14 +4,13 @@ package scdip
 object Order {
 
   case class HoldOrder(power: Power, unitType: UnitType, src: Location) extends NonMoveOrder {
-    def ~~(order: Order): Boolean = order match {
-      case nm: NonMoveOrder => src ~~ nm.src
-      case _ => false
-    }
+    override def toString: String = s"$power: $unitType $src H"
   }
 
   case class MoveOrder(power: Power, unitType: UnitType, src: Location, dst: Location) extends Order {
-    def ~~(order: MoveOrder): Boolean = (order.src ~~ src) && (order.dst ~~ dst)
+    override def toString: String = s"$power: $unitType $src - $dst"
+
+    def ~~(moveOrder: MoveOrder): Boolean = src ~~ moveOrder.src && dst ~~ moveOrder.dst
 
     def canConvoy(worldMap: WorldMap, orders: Seq[Order]): Boolean = {
       worldMap.canConvoy(src.province, dst.province,
@@ -22,9 +21,12 @@ object Order {
     }
 
     def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(src, dst)
+
+    def requireConvoy(worldMap: WorldMap): Boolean = isNeighbour(worldMap)
   }
 
   trait SupportOrder extends NonMoveOrder {
+
     def canSupport(o: Order): Boolean
 
     def existsSupportTarget(orders: Seq[Order]): Boolean
@@ -34,7 +36,7 @@ object Order {
   }
 
   case class SupportHoldOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, targetSrc: Location) extends SupportOrder {
-
+    override def toString: String = s"$power: $unitType $src S $targetUnit $targetSrc"
     override def canSupport(o: Order): Boolean = o match {
       case nm: NonMoveOrder => targetSrc ~~ nm.src
       case _ => false
@@ -52,6 +54,7 @@ object Order {
   }
 
   case class SupportMoveOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends SupportOrder {
+    override def toString: String = s"$power: $unitType $src S $targetUnit $from - $to"
     override def canSupport(o: Order): Boolean = o match {
       case m: MoveOrder => from ~~ m.src && to ~~ m.dst
       case _ => false
@@ -69,6 +72,7 @@ object Order {
   }
 
   case class ConvoyOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends NonMoveOrder {
+    override def toString: String = s"$power: $unitType $src C $targetUnit $from - $to"
     def findConvoyed(orders: Seq[Order]): Option[MoveOrder] = {
       orders.flatMap {
         case m: MoveOrder => Option(m)
