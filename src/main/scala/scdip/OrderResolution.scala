@@ -11,6 +11,7 @@ case class OrderResolution(worldMap: WorldMap) {
     orderState.evaluate(step1)
       .evaluate(step2)
       .evaluate(step3)
+      .evaluate(step4)
   }
 
   // Step 1. Mark All Invalid Convoy Orders
@@ -33,10 +34,9 @@ case class OrderResolution(worldMap: WorldMap) {
 
   // Step 2. Mark All Invalid Move and Support Orders
   private def step2(orderState: OrderState): OrderState = {
-    val orders = orderState.orders
     orderState.orderMatrix.foldLeft(orderState) {
       case (os, (s: SupportOrder, _)) if !s.reachSupport(worldMap) => os.setMark(s, VoidMark("not reach support target"))
-      case (os, (s: SupportOrder, _)) if !s.existsSupportTarget(orders) => os.setMark(s, VoidMark("no support target"))
+      case (os, (s: SupportOrder, _)) if !s.existsSupportTarget(os.orders) => os.setMark(s, VoidMark("no support target"))
       case (os, (s: SupportHoldOrder, nm: NonMoveOrder)) if s.canSupport(nm) => os.addSupport(nm, s)
       case (os, (s: SupportMoveOrder, m: MoveOrder)) if s.canSupport(m) => os.addSupport(m, s)
       case (os, _) => os
@@ -48,18 +48,6 @@ case class OrderResolution(worldMap: WorldMap) {
     orderState.moves.filter(_.isNeighbour(worldMap)).foldLeft(orderState) {
       case (os, m) => cutSupport(os, m)
     }
-    //    (for {
-    //      m <- orderState.moves.filter(_.isNeighbour(worldMap))
-    //      s <- orderState.supports
-    //    } yield (m, s)).foldLeft(orderState) {
-    //      case (os, (m, so: SupportHoldOrder)) if so.src ~~ m.dst &&
-    //        os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
-    //        so.power != m.power => os.setMark(so, CutMark()).delSupport(so)
-    //      case (os, (m, so: SupportMoveOrder)) if so.src ~~ m.dst &&
-    //        os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
-    //        so.power != m.power => os.setMark(so, CutMark()).delSupport(so).delNoHelpList(m, so)
-    //      case (os, _) => os
-    //    }
   }
 
   private def cutSupport(orderState: OrderState, moveOrder: MoveOrder): OrderState = {
@@ -82,41 +70,19 @@ case class OrderResolution(worldMap: WorldMap) {
 
   // Step 4. Mark Support Cuts Made by Convoyers and Mark Endangered Convoys
   private def step4(orderState: OrderState): OrderState = {
-    // checkDisruption
-    val newOS = checkDisruption(orderState)
-
-    val newOS2 = newOS.convoyTargets.foldLeft(newOS) {
-      case (os, m) if os.getMark(m).isEmpty => cutSupport(os, m).addConvoySucceeded(m)
-      case (os, m) => os.setMark(m, ConvoyUnderAttack())
-    }
-    if (newOS2.convoySucceededSize > newOS.convoySucceededSize) {
-      // TODO: recursive
-    } else {
-      // do nothing
-      newOS2
-    }
-    (for {
-      m <- newOS.convoyTargets
-      s <- newOS.orders.flatMap {
-        case (o: SupportOrder) => Option(o)
-        case _ => None
+    orderState.evaluate(checkDisruption)
+      .evaluate { newOS =>
+        newOS.convoyTargets.foldLeft(newOS) {
+          case (os, m) if os.getMark(m).isEmpty => cutSupport(os, m).evaluate { os =>
+            if (os.isConvoySuccess(m)) {
+              os
+            } else {
+              step4(os.addConvoySucceeded(m))
+            }
+          }
+          case (os, m) => os.setMark(m, ConvoyUnderAttack())
+        }
       }
-    } yield (m, s)).foldLeft(orderState) {
-      case (os, (m, so: SupportHoldOrder)) if m.dst ~~ so.src &&
-        os.getMark(so).fold(true)(m => !m.isInstanceOf[VoidMark] && !m.isInstanceOf[CutMark]) &&
-        so.power != m.power &&
-        os.supportTarget(so).fold(true) {
-          case (o: ConvoyOrder) if os._convoyingArmies.contains(o) => false
-          case _ => true
-        } => os.setMark(so, CutMark()).delSupport(so)
-      case (os, (m, so: SupportMoveOrder)) if m.dst ~~ so.src &&
-        os.getMark(so).fold(false)(m => m.isInstanceOf[VoidMark] || m.isInstanceOf[CutMark]) &&
-        so.power != m.power &&
-        os.supportTarget(so).fold(true) {
-          case (o: ConvoyOrder) if os._convoyingArmies.contains(o) => false
-          case _ => true
-        } => os.setMark(so, CutMark()).delSupport(so).delNoHelpList(so)
-    }
   }
 
   private def checkDisruption(orderState: OrderState): OrderState = {
@@ -246,6 +212,8 @@ case class OrderState(orders: Seq[Order],
 
   // convoy success
   def addConvoySucceeded(m: MoveOrder): OrderState = copy(_convoySucceeded = _convoySucceeded + m)
+
+  def isConvoySuccess(m: MoveOrder): Boolean = _convoySucceeded.contains(m)
 
   def convoySucceededSize: Int = _convoySucceeded.size
 
