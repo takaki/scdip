@@ -11,7 +11,7 @@ case class OrderResolution(worldMap: WorldMap) {
     orderState.evaluate(step1)
       .evaluate(step2)
       .evaluate(step3)
-      .evaluate(step4)
+      .evaluate(step4to5)
   }
 
   // Step 1. Mark All Invalid Convoy Orders
@@ -72,7 +72,7 @@ case class OrderResolution(worldMap: WorldMap) {
   private def step4(orderState: OrderState): OrderState = {
     orderState.evaluate(checkDisruption)
       .evaluate { newOS =>
-        newOS.convoyTargets.foldLeft(newOS) {
+        newOS.convoyAllTargets.foldLeft(newOS) {
           case (os, m) if os.getMark(m).isEmpty => cutSupport(os, m).evaluate { os =>
             if (os.isConvoySuccess(m)) {
               os
@@ -86,7 +86,7 @@ case class OrderResolution(worldMap: WorldMap) {
   }
 
   private def checkDisruption(orderState: OrderState): OrderState = {
-    orderState.convoyFleets.foldLeft(orderState) {
+    orderState.convoyAllFleets.foldLeft(orderState) {
       case (os, c) => os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
         os.convoyTarget(c).map(m => os.setMark(m, ConvoyEndangered()))
       } else {
@@ -96,14 +96,86 @@ case class OrderResolution(worldMap: WorldMap) {
   }
 
   // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
+  private def step5(orderState: OrderState): OrderState = {
+    orderState.evaluate(checkDisruption).evaluate { os =>
+      os.convoyAllTargets.foldLeft(os) { case (os1, m) =>
+        if (os1.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
+          os1.setMark(m, NoConvoy()).delSupportTarget(m).evaluate {
+            os2 => os2.convoyFleets(m).foldLeft(os2) { case (os3, c) => os3.setMark(c, NoConvoy()) }
+          }
+        } else {
+          if (os1.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
+            os1.delMark(m).evaluate { os2 => cutSupport(os2, m) }.evaluate { os =>
+              if (os.isConvoySuccess(m)) {
+                os
+              } else {
+                step4to5(os.addConvoySucceeded(m))
+              }
+            }
+          } else {
+            os1
+          }
+        }
+      }
+    }
+  }
+
+  private def step4to5(orderState: OrderState): OrderState = {
+    orderState.evaluate(step4).evaluate(step5)
+  }
+
   // Step 6. Mark Bounces Caused by Inability to Swap Places
+  private def step6(orderState: OrderState): OrderState = {
+    (for {
+      m <- orderState.moves.filter(m => m.isNeighbour(worldMap) && orderState.getMark(m).isEmpty)
+      swapper <- orderState.moves if orderState.getMark(swapper).isEmpty && swapper.dst ~~ m.src && swapper.src ~~ m.dst && swapper.isNeighbour(worldMap)
+    } yield (m, swapper)).foldLeft(orderState) {
+      case (os, (m, sw)) => if (m.power == sw.power || os.supportCountNH(m) <= os.supportCount(sw)) {
+        step6(bounce(os, m))
+      } else if (m.power == sw.power || os.supportCountNH(sw) <= os.supportCount(m)) {
+        step6(bounce(os, sw))
+      } else {
+        os
+      }
+    }
+  }
+
+  private def bounce(orderState: OrderState, moveOrder: MoveOrder): OrderState = {
+    orderState.setMark(moveOrder, Bounce()).delNoHelpTarget(moveOrder).delSupportTarget(moveOrder)
+  }
+
+  private def step6to9(orderState: OrderState): OrderState = {
+    orderState.evaluate(step6).evaluate(step7).evaluate(step8).evaluate(step9)
+  }
+
+  private def step6to8(orderState: OrderState): OrderState = {
+    orderState.evaluate(step6).evaluate(step7).evaluate(step8)
+  }
+
+  private def step6to7(orderState: OrderState): OrderState = {
+    orderState.evaluate(step6).evaluate(step7)
+  }
+
   // Step 7. Mark Bounces Suffered by Understrength Attackers
+  def step7(orderState: OrderState): OrderState = {
+    // 要するにcombat listに載っている地域に移動しようとして十分なサポートがないとbounce
+    orderState
+  }
+
   // Step 8. Mark Bounces Caused by Inability to Self-Dislodge
+  def step8(orderState: OrderState): OrderState = {
+    orderState
+  }
+
   // Step 9. Mark Supports Cut By Dislodgements
+  def step9(orderState: OrderState): OrderState = {
+    orderState
+  }
 
 
 }
 
+// TODO: separate OrderState trait and OrdateStateImpl
 case class OrderState(orders: Seq[Order],
                       _orderMark: Map[Order, OrderMark] = Map.empty,
                       _supportCount: Map[SupportOrder, Order] = Map.empty,
@@ -114,18 +186,29 @@ case class OrderState(orders: Seq[Order],
     evaluator(this)
   }
 
-
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
 
   def holds: Seq[HoldOrder] = orders.collect { case x: HoldOrder => x }
 
+
   def supports: Seq[SupportOrder] = orders.collect { case o: SupportOrder => o }
 
-  private val combatList: Set[Province] = orders.map {
-    case (m: MoveOrder) => m.dst
-    case x => x.src
-  }.map(_.province).toSet
+  // combat list
+  def combatList(province: Province): Seq[Order] = combatListMap.collect {
+    case (o, p) if p == province => o
+  }.toSeq
 
+  private val combatListMap: Map[Order, Province] = orders.map {
+    case (m: MoveOrder) => m -> m.dst.province
+    case (o) => o -> o.src.province
+  }.toMap
+
+  def combatWinner = {
+    combatListMap.values.toSet.flatMap { province =>
+      val highest: Int = combatListMap.collect { case (o, p) if p == province => supportCount(o) }.toSeq.sorted.reverse.headOption.getOrElse(0)
+      combatListMap.collect { case (m: MoveOrder, p) if p == province => m }.filter(o => supportCount(o) <= highest && getMark(o).isEmpty)
+    }
+  }
 
   def orderMatrix: Seq[(Order, Order)] = {
     for {
@@ -145,8 +228,10 @@ case class OrderState(orders: Seq[Order],
 
   // mark
   def setMark(order: Order, mark: OrderMark): OrderState = {
-    copy(_orderMark = _orderMark.updated(order, mark))
+    copy(_orderMark = _orderMark + (order -> mark))
   }
+
+  def delMark(m: MoveOrder): OrderState = copy(_orderMark = _orderMark - m)
 
   def getMark(order: Order): Option[OrderMark] = _orderMark.get(order)
 
@@ -165,6 +250,10 @@ case class OrderState(orders: Seq[Order],
 
   def delSupport(supportOrder: SupportOrder): OrderState = {
     copy(_supportCount = _supportCount - supportOrder)
+  }
+
+  def delSupportTarget(m: MoveOrder): OrderState = {
+    copy(_supportCount = _supportCount.filterNot { case (s, o) => o == m })
   }
 
   def supportTarget(supportOrder: SupportOrder): Option[Order] = _supportCount.get(supportOrder)
@@ -193,8 +282,16 @@ case class OrderState(orders: Seq[Order],
     copy(_noHelps = _noHelps - supportMoveOrder)
   }
 
+  def delNoHelpTarget(moveOrder: MoveOrder): OrderState = {
+    copy(_noHelps = _noHelps.filterNot { case (s, o) => o == moveOrder })
+  }
+
   def getNoHelpList(moveOrder: MoveOrder): Seq[SupportMoveOrder] = {
     _noHelps.collect { case (sm, m) if m ~~ moveOrder => sm }.toSeq
+  }
+
+  def supportCountNH(moveOrder: MoveOrder): Int = {
+    _supportCount.count { case (k, v) => v == moveOrder } - getNoHelpList(moveOrder).size
   }
 
   // convoyingArmies
@@ -204,9 +301,11 @@ case class OrderState(orders: Seq[Order],
 
   def convoyTarget(convoyOrder: ConvoyOrder): Option[MoveOrder] = _convoyingArmies.get(convoyOrder)
 
-  def convoyFleets: Set[ConvoyOrder] = _convoyingArmies.keys.toSet
+  def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.keys.toSet
 
-  def convoyTargets: Set[MoveOrder] = _convoyingArmies.values.toSet
+  def convoyAllTargets: Set[MoveOrder] = _convoyingArmies.values.toSet
+
+  def convoyFleets(moveOrder: MoveOrder): Seq[ConvoyOrder] = _convoyingArmies.collect { case (c, m) if m == moveOrder => c }.toSeq
 
   def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = _convoyingArmies.contains(convoyOrder)
 
@@ -255,10 +354,11 @@ object OrderMark {
 
   case class ConvoyUnderAttack(message: String = "") extends OrderMark
 
+  case class Bounce(message: String = "") extends OrderMark
+
 }
 
 
 sealed trait OrderMark {
   def message: String
 }
-
