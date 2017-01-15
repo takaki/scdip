@@ -59,14 +59,14 @@ class OrderResolutionSpecs extends Specification {
             |England: A lon S A yor""".stripMargin)
         val os0 = adjudicator(os)
         os0.getMark(os.orders(1)) must beNone
-        os0.supportCount(os.orders(0)) === 1
+        os0.supportRecord.supportCount(os.orders(0)) === 1
 
       }
       "support hold: fail" >> {
         val os = parseOrders("England: A lon S A yor")
         val os0 = adjudicator(os)
         os0.getMark(os.orders(0)) must beSome
-        os0.supportCount(os.orders(0)) === 0
+        os0.supportRecord.supportCount(os.orders(0)) === 0
       }
       "support move" >> {
         val os = parseOrders(
@@ -74,7 +74,7 @@ class OrderResolutionSpecs extends Specification {
             |England: A lon S A yor - wal""".stripMargin)
         val os0 = adjudicator(os)
         os0.getMark(os.orders(1)) must beNone
-        os0.supportCount(os.orders(0)) === 1
+        os0.supportRecord.supportCount(os.orders(0)) === 1
 
       }
       "self attack no help list" >> {
@@ -97,7 +97,7 @@ class OrderResolutionSpecs extends Specification {
         val os0 = adjudicator(os)
         os0.getMark(os.orders(0)) must beSome
         os0.getMark(os.orders(1)) must beNone
-        os0.supportCount(os.orders(1)) === 0
+        os0.supportRecord.supportCount(os.orders(1)) === 0
       }
     }
   }
