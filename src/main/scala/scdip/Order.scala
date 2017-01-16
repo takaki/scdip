@@ -73,11 +73,8 @@ object Order {
 
   case class ConvoyOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends NonMoveOrder {
     override def toString: String = s"$power: $unitType $src C $targetUnit $from - $to"
-    def findConvoyed(orders: Seq[Order]): Option[MoveOrder] = {
-      orders.flatMap {
-        case m: MoveOrder => Option(m)
-        case _ => None
-      }.find(m => from ~~ m.src && to ~~ m.dst)
+    def findConvoyTarget(moves: Seq[MoveOrder]): Option[MoveOrder] = {
+      moves.find(m => from ~~ m.src && to ~~ m.dst)
     }
 
   }
