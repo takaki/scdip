@@ -15,28 +15,37 @@ case class MovementState(turn: Turn,
   val phaseType = PhaseType.Movement
 
   override def next(orderResults: Seq[OrderResult]): GameState = {
-    val targets: Set[Location] = orderResults.flatMap {
+    val moves: Seq[MoveOrder] = orderResults.flatMap {
       case (or) => or.flatRun {
-        case a: MoveOrder => Option(a.dst)
+        case a: MoveOrder => Option(a)
         case _ => None
       }
-    }.toSet
-    val origins: Set[Location] = orderResults.flatMap {
-      case (or) => or.flatRun {
-        case a: MoveOrder => Option(a.src)
-        case _ => None
-      }
-    }.toSet
-    val dislodgedLocations = targets -- origins
-    val dislodgedUnits = unitLocation.getUnits(dislodgedLocations.toSeq)
-    val clearedUnitLocation = origins.foldLeft(unitLocation) { (u, or) => u.clear(or) }
-    val newUnitLocation = orderResults.foldLeft(clearedUnitLocation) {
-      case (u, or) => or.run {
-        case (a: MoveOrder) => u.updated(UnitState(a.dst, or.gameUnit))
-        case _ => u
-      }.getOrElse(u)
     }
-    RetreatState(turn, supplyCenterInfo, newUnitLocation, dislodgedUnits)
+    val targets: Set[Location] = moves.map(_.dst).toSet
+    val dislodged: Seq[Location] = orderResults.collect {
+      case (or: FailureResult) if targets.contains(or.order.src) => or.order.src
+      case (or: SuccessResult) if targets.contains(or.order.src) && !or.order.isInstanceOf[MoveOrder] => or.order.src
+    }
+    val clearedUnitLocation = dislodged.foldLeft(unitLocation) { (u, l) => u.clear(l) }
+    val newUnitLocation = move(clearedUnitLocation, moves)
+    RetreatState(turn, supplyCenterInfo, newUnitLocation, unitLocation.getUnits(dislodged))
+  }
+
+  @scala.annotation.tailrec
+  private def move(unitLocation: UnitLocation, moves: Seq[MoveOrder]): UnitLocation = {
+    if (moves.isEmpty) {
+      unitLocation
+    } else {
+      val (s, f) = moves.partition(m => unitLocation.isEmpty(m.dst))
+      if (s.isEmpty && f.nonEmpty) {
+//        throw new RuntimeException(s"infinite loop $unitLocation $s $f ")
+        unitLocation
+      } else {
+        move(s.foldLeft(unitLocation) {
+          case (u, m) => u.clear(m.src).updated(UnitState(m.dst, m.toGameUnit))
+        }, f)
+      }
+    }
   }
 }
 

@@ -8,6 +8,8 @@ object Order {
   }
 
   case class MoveOrder(power: Power, unitType: UnitType, src: Location, dst: Location) extends Order {
+
+
     override def toString: String = s"$power: $unitType $src - $dst"
 
     def ~~(moveOrder: MoveOrder): Boolean = src ~~ moveOrder.src && dst ~~ moveOrder.dst
@@ -20,9 +22,8 @@ object Order {
         }.map(c => c.src.province).toSet)
     }
 
-    def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(src, dst)
 
-    def requireConvoy(worldMap: WorldMap): Boolean = isNeighbour(worldMap)
+    def requireConvoy(worldMap: WorldMap): Boolean = !(worldMap.isNeighbour(src, dst) || src ~~ dst)
   }
 
   trait SupportOrder extends NonMoveOrder {
@@ -37,6 +38,7 @@ object Order {
 
   case class SupportHoldOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, targetSrc: Location) extends SupportOrder {
     override def toString: String = s"$power: $unitType $src S $targetUnit $targetSrc"
+
     override def canSupport(o: Order): Boolean = o match {
       case nm: NonMoveOrder => targetSrc ~~ nm.src
       case _ => false
@@ -55,6 +57,7 @@ object Order {
 
   case class SupportMoveOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends SupportOrder {
     override def toString: String = s"$power: $unitType $src S $targetUnit $from - $to"
+
     override def canSupport(o: Order): Boolean = o match {
       case m: MoveOrder => from ~~ m.src && to ~~ m.dst
       case _ => false
@@ -73,6 +76,7 @@ object Order {
 
   case class ConvoyOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends NonMoveOrder {
     override def toString: String = s"$power: $unitType $src C $targetUnit $from - $to"
+
     def findConvoyTarget(moves: Seq[MoveOrder]): Option[MoveOrder] = {
       moves.find(m => from ~~ m.src && to ~~ m.dst)
     }
@@ -96,6 +100,8 @@ sealed trait OrderBase {
   def success = SuccessResult(power, this)
 
   def failure = FailureResult(power, this)
+
+  def toGameUnit: GameUnit = GameUnit(power, unitType)
 
 }
 

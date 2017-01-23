@@ -80,10 +80,13 @@ case class VictoryCondition(winningSupplyCenters: Int, yearsWithoutScCapture: In
 case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Province, Option[Power]])
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
+  override def toString: String = locationUnitMap.map { case (l, gu) => s"$l[$gu]" }.mkString("; ")
+
+  def isEmpty(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
 
   def updated(unitState: UnitState): UnitLocation = copy(locationUnitMap.updated(unitState.location, unitState.gameUnit))
 
-  def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap - location)
+  def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, gu) => l ~~ location })
 
   private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
 
