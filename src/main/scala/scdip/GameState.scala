@@ -21,10 +21,10 @@ case class MovementState(turn: Turn,
         case _ => None
       }
     }
-    val targets: Set[Location] = moves.map(_.dst).toSet
+    val targets: Set[Province] = moves.map(_.dst.province).toSet
     val dislodged: Seq[Location] = orderResults.collect {
-      case (or: FailureResult) if targets.contains(or.order.src) => or.order.src
-      case (or: SuccessResult) if targets.contains(or.order.src) && !or.order.isInstanceOf[MoveOrder] => or.order.src
+      case (or: FailureResult) if targets.contains(or.order.src.province) => or.order.src
+      case (or: SuccessResult) if targets.contains(or.order.src.province) && !or.order.isInstanceOf[MoveOrder] => or.order.src
     }
     val clearedUnitLocation = dislodged.foldLeft(unitLocation) { (u, l) => u.clear(l) }
     val newUnitLocation = move(clearedUnitLocation, moves)

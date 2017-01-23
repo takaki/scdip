@@ -20,6 +20,7 @@ class OrderResolutionSpecs extends Specification {
       case NoSuccess(errorMessage, next) => throw new RuntimeException(s"$errorMessage on line ${next.pos.line} on column ${next.pos.column}")
     }
   }
+  val iniState = variant.movementState
 
   def parseOrders(input: String): OrderState = OrderState(input.lines.map(parser(_)).toList, variant.worldMap)
 
@@ -47,6 +48,7 @@ class OrderResolutionSpecs extends Specification {
     os0.markRecord.getMark(os0.orders(2)) must beNone
     os0.markRecord.getMark(os0.orders(3)) must beNone
     os0.markRecord.getMark(os0.orders(4)) must beNone
+    os0.results.collect{case(s:SuccessResult) => s} must have size(3)
   }
 
   "fail with no path" >> {
