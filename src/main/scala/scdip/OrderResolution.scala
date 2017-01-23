@@ -190,6 +190,8 @@ object OrderState {
       val tryMoves: Seq[MoveOrder] = orderState.combatListRecord.orders(province).collect { case (m: MoveOrder) => m }
       if (tryMoves.count(m => orderState.supportRecord.supportCount(m) == highest && orderState.notMarked(m)) > 1) {
         tryMoves
+      } else if (highest == 0 && orderState.combatListRecord.orders(province).size > 1) {
+        tryMoves.filter(m => orderState.notMarked(m))
       } else {
         tryMoves.filter(m => orderState.supportRecord.supportCount(m) < highest && orderState.notMarked(m))
       }
@@ -332,6 +334,8 @@ case class OrderState(orders: Seq[Order],
                       supportRecord: SupportRecord = SupportRecord(),
                       convoyingArmies: ConvoyingArmies = ConvoyingArmies(),
                       convoySucceeded: ConvoySucceeded = ConvoySucceeded()) {
+
+  def getMark(order: Order): Option[OrderMark] = markRecord.getMark(order)
 
   def notMarked(order: Order): Boolean = markRecord.getMark(order).isEmpty
 

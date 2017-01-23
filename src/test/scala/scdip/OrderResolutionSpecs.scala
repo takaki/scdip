@@ -48,7 +48,19 @@ class OrderResolutionSpecs extends Specification {
     os0.markRecord.getMark(os0.orders(2)) must beNone
     os0.markRecord.getMark(os0.orders(3)) must beNone
     os0.markRecord.getMark(os0.orders(4)) must beNone
-    os0.results.collect{case(s:SuccessResult) => s} must have size(3)
+    os0.results.collect { case (s: SuccessResult) => s } must have size 3
+  }
+
+  "CASE 6.A.10.old (Nov-24-2001 DATC)" >> {
+    val os = parseOrders(
+      """	Austria: A budapest SUPPORTS F trieste-venice
+        |	Austria: F trieste-venice
+        |	Italy: A venice HOLD
+        |""".stripMargin).resolve
+    os.getMark(os.orders(0)) must beSome
+    os.supportRecord.supportCount(os.orders(1)) === 0
+    os.getMark(os.orders(1)) must beSome
+    os.getMark(os.orders(2)) must beNone
   }
 
   "fail with no path" >> {
