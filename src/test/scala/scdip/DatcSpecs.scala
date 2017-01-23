@@ -19,7 +19,7 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get
-    Fragments.foreach(datcs.slice(5,26))(d => d.title >> {
+    Fragments.foreach(datcs.slice(7,26))(d => d.title >> {
       Fragments.foreach(d.runTest)(t => t._1 >> {
         t._2.apply()
       })
@@ -43,8 +43,7 @@ case class Datc(variant: Variant,
     if (phase.phaseType == Movement && supplyCenterOwner.isEmpty && preStateDislodged.isEmpty && preStateResult.isEmpty) {
       val iniState = variant.movementState
       val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
-      val newOS = OrderState(orders,variant.worldMap).resolve
-      val retreatState = testState.next(newOS.results).asInstanceOf[RetreatState] // TODO: FIXME
+      val retreatState = testState.next(orders).asInstanceOf[RetreatState] // TODO: FIXME
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.toSet === postState.toSet),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {

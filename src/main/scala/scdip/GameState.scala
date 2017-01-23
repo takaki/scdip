@@ -5,7 +5,7 @@ import scdip.Order.MoveOrder
 trait GameState {
   def phaseType: PhaseType
 
-  def next(orderResults: Seq[OrderResult]): GameState
+  def next(orders: Seq[Order]): GameState
 }
 
 case class MovementState(turn: Turn,
@@ -14,7 +14,9 @@ case class MovementState(turn: Turn,
                          powers: Map[String, Power], worldMap: WorldMap, victoryCondition: VictoryCondition) extends GameState {
   val phaseType = PhaseType.Movement
 
-  override def next(orderResults: Seq[OrderResult]): GameState = {
+  override def next(orders: Seq[Order]): GameState = {
+    val orderResults = OrderState(unitLocation.filterOrders(orders), worldMap).resolve.results
+
     val moves: Seq[MoveOrder] = orderResults.flatMap {
       case (or) => or.flatRun {
         case a: MoveOrder => Option(a)
@@ -38,7 +40,7 @@ case class MovementState(turn: Turn,
     } else {
       val (s, f) = moves.partition(m => unitLocation.isEmpty(m.dst))
       if (s.isEmpty && f.nonEmpty) {
-//        throw new RuntimeException(s"infinite loop $unitLocation $s $f ")
+        //        throw new RuntimeException(s"infinite loop $unitLocation $s $f ")
         unitLocation
       } else {
         move(s.foldLeft(unitLocation) {
@@ -52,13 +54,13 @@ case class MovementState(turn: Turn,
 case class RetreatState(turn: Turn, supplyCenterInfo: SupplyCenterInfo, unitLocation: UnitLocation, dislodgeUnits: Seq[UnitState]) extends GameState {
   override val phaseType = PhaseType.Retreat
 
-  override def next(orderResults: Seq[OrderResult]): GameState = ???
+  override def next(orders: Seq[Order]): GameState = ???
 }
 
 case class AdjustmentState() extends GameState {
   override val phaseType = PhaseType.Adjustment
 
-  override def next(orderResults: Seq[OrderResult]): GameState = ???
+  override def next(orders: Seq[Order]): GameState = ???
 }
 
 object PhaseType {

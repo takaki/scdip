@@ -97,6 +97,10 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   def unitStats: List[UnitState] = {
     locationUnitMap.toList.map { case (l, g) => UnitState(l, g) }
   }
+
+  def filterOrders(orders: Seq[Order]): Seq[Order] = {
+    orders.filter(o => locationUnitMap.exists{case(l, gu) => o.src == l && o.power == gu.power && o.unitType == gu.unitType})
+  }
 }
 
 case class UnitState(location: Location, gameUnit: GameUnit) {
