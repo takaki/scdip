@@ -41,21 +41,34 @@ object OrderState {
 
   // Step 2. Mark All Invalid Move and Support Orders
   private def step2(orderState: OrderState): OrderState = {
-    (for {
-      s <- orderState.supports
-      o <- orderState.orders
-    } yield (s, o)).foldLeft(orderState) {
-      case (os, (s, _)) if !s.existsSupportTarget(os.orders.filter(o=>os.notMarked(o))) => os.setMark(s, VoidMark("no support target"))
-      case (os, (s, _)) if !s.reachSupport(orderState.worldMap) => os.setMark(s, VoidMark("not reach support target"))
-      case (os, (s: SupportHoldOrder, nm: NonMoveOrder)) if s.canSupport(nm) => os.setSupportRecord(orderState.supportRecord.addSupport(nm, s))
-      case (os, (s: SupportMoveOrder, m: MoveOrder)) if s.canSupport(m) => os.setSupportRecord(
-        (if (os.orders.exists(o => o.src ~~ m.dst && o.power == m.power)) {
-          os.supportRecord.addNoHelpList(m, s)
-        } else {
-          os.supportRecord
-        }).addSupport(m, s))
-      case (os, _) => os
+    def check0(orderState: OrderState): OrderState = {
+      orderState.supports.filter(orderState.notMarked(_)).foldLeft(orderState) {
+        case (os, s) =>
+          if (!s.reachSupport(orderState.worldMap)) {
+            os.setMark(s, VoidMark("not reach support target"))
+          } else {
+            os
+          }
+      }
     }
+
+    def check1(orderState: OrderState): OrderState = {
+      orderState.supports.filter(orderState.notMarked(_)).foldLeft(orderState) {
+        case (os, s: SupportHoldOrder) =>
+          s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target"))) {
+            case (m: NonMoveOrder) => os.addSupport(m, s)
+            case _ => os
+          }
+        case (os, s: SupportMoveOrder) =>
+          s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target"))) {
+            case (m: MoveOrder) => os.addSupport(m, s).addNoHelpList(m, s)
+            case _ => os
+          }
+
+      }
+    }
+
+    (check0 _).andThen(check1)(orderState)
   }
 
   //  Step 3. Calculate Initial Combat Strengths
@@ -327,7 +340,7 @@ object OrderState {
 
 }
 
-case class OrderResults(orderResults: Seq[OrderResult],
+case class OrderResults(results: Seq[OrderResult],
                         supportRecord: SupportRecord,
                         convoyingArmies: ConvoyingArmies,
                         convoySucceeded: ConvoySucceeded) {
@@ -339,6 +352,11 @@ case class OrderState(orders: Seq[Order],
                       supportRecord: SupportRecord = SupportRecord(),
                       convoyingArmies: ConvoyingArmies = ConvoyingArmies(),
                       convoySucceeded: ConvoySucceeded = ConvoySucceeded()) {
+
+  def addNoHelpList(m: MoveOrder, s: SupportMoveOrder): OrderState = copy(supportRecord = supportRecord.addNoHelpList(m, s))
+
+  def addSupport(o: Order, s: SupportOrder): OrderState = copy(supportRecord = supportRecord.addSupport(o, s))
+
   def supportCount(o: Order): Int = supportRecord.supportCount(o)
 
 

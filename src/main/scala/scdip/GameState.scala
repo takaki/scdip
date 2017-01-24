@@ -15,16 +15,16 @@ case class MovementState(turn: Turn,
   val phaseType = PhaseType.Movement
 
   override def next(orders: Seq[Order]): GameState = {
-    val orderResults = OrderState(unitLocation.filterOrders(orders), worldMap).resolve.orderResults
+    val orderResults = OrderState(unitLocation.filterOrders(orders), worldMap).resolve
 
-    val moves: Seq[MoveOrder] = orderResults.flatMap {  
+    val moves: Seq[MoveOrder] = orderResults.results.flatMap {
       case (or) => or.flatRun {
         case a: MoveOrder => Option(a)
         case _ => None
       }
     }
     val targets: Set[Province] = moves.map(_.dst.province).toSet
-    val dislodged: Seq[Location] = orderResults.collect {
+    val dislodged: Seq[Location] = orderResults.results.collect {
       case (or: FailureResult) if targets.contains(or.order.src.province) => or.order.src
       case (or: SuccessResult) if targets.contains(or.order.src.province) && !or.order.isInstanceOf[MoveOrder] => or.order.src
     }

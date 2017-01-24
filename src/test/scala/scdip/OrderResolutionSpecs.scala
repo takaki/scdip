@@ -31,7 +31,7 @@ class OrderResolutionSpecs extends Specification {
         |England: A Yorkshire-Yorkshire
         |England: A liverpool supports A Yorkshire-Yorkshire""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(2).mark must beSome(VoidMark("same place"))
+    os0.results(2).mark must beSome(VoidMark("same place"))
   }
 
   "CASE 6.A.5 (Move to own sector with convoy)" >> {
@@ -43,12 +43,12 @@ class OrderResolutionSpecs extends Specification {
         |	Germany: A Wales SUPPORTS F london-yorkshire
         |""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
-    os0.orderResults(1).mark must beSome(VoidMark("same place"))
-    os0.orderResults(2).mark must beNone
-    os0.orderResults(3).mark must beNone
-    os0.orderResults(4).mark must beNone
-    os0.orderResults.collect { case (s: SuccessResult) => s } must have size 3
+    os0.results(0).mark must beSome
+    os0.results(1).mark must beSome(VoidMark("same place"))
+    os0.results(2).mark must beNone
+    os0.results(3).mark must beNone
+    os0.results(4).mark must beNone
+    os0.results.collect { case (s: SuccessResult) => s } must have size 3
   }
 
   "CASE 6.A.10.old (Nov-24-2001 DATC)" >> {
@@ -57,35 +57,35 @@ class OrderResolutionSpecs extends Specification {
         |	Austria: F trieste-venice
         |	Italy: A venice HOLD
         |""".stripMargin).resolve
-    os.orderResults(0).mark must beSome
+    os.results(0).mark must beSome
 //    os.supportRecord.supportCount(os.orderResults(1).order) === 0
-    os.orderResults(1).mark must beSome
-    os.orderResults(2).mark must beNone
+    os.results(1).mark must beSome
+    os.results(2).mark must beNone
   }
 
   "fail with no path" >> {
     val os = parseOrders("England: A lon - ukr")
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
+    os0.results(0).mark must beSome
   }
   "fail with no convoy fleets" >> {
     val os = parseOrders("England: A lon - nwy")
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
+    os0.results(0).mark must beSome
   }
   "correct convoy" >> {
     val os = parseOrders(
       """England: A lon - nwy
         |England: F nth convoys A lon - nwy""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(0).mark must beNone
-    os0.orderResults(1).mark must beNone
+    os0.results(0).mark must beNone
+    os0.results(1).mark must beNone
     os0.convoyingArmies.convoyAllFleets must have size 1
   }
   "void convoy" >> {
     val os = parseOrders("England: F nth C A lon - nwy")
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
+    os0.results(0).mark must beSome
   }
 
   "support hold" >> {
@@ -93,14 +93,14 @@ class OrderResolutionSpecs extends Specification {
       """England: A yor H
         |England: A lon S A yor""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(1).mark must beNone
+    os0.results(1).mark must beNone
     os0.supportRecord.supportCount(os.orders(0)) === 1
 
   }
   "support hold: fail" >> {
     val os = parseOrders("England: A lon S A yor")
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
+    os0.results(0).mark must beSome
     os0.supportRecord.supportCount(os.orders(0)) === 0
   }
   "support move" >> {
@@ -108,7 +108,7 @@ class OrderResolutionSpecs extends Specification {
       """England: A yor - wal
         |England: A lon S A yor - wal""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(1).mark must beNone
+    os0.results(1).mark must beNone
     os0.supportRecord.supportCount(os.orders(0)) === 1
 
   }
@@ -118,7 +118,7 @@ class OrderResolutionSpecs extends Specification {
         |England: A yor H
         |England: A wal S A lon - yor""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(1).mark must beNone
+    os0.results(1).mark must beNone
     //        os0.supportCount(os.orders(0)) === 1
     //        os0.getNoHelpList(os.orders(0).asInstanceOf[MoveOrder]) must have size 1
   }
@@ -128,8 +128,8 @@ class OrderResolutionSpecs extends Specification {
         |England: A yor H
         |France: A wal - lon""".stripMargin)
     val os0 = os.resolve
-    os0.orderResults(0).mark must beSome
-    os0.orderResults(1).mark must beNone
+    os0.results(0).mark must beSome
+    os0.results(1).mark must beNone
     os0.supportRecord.supportCount(os.orders(1)) === 0
   }
 }

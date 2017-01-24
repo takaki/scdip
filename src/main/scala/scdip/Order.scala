@@ -30,7 +30,7 @@ object Order {
 
     def canSupport(o: Order): Boolean
 
-    def existsSupportTarget(orders: Seq[Order]): Boolean
+    def findSupportTarget(orders: Seq[Order]): Option[Order]
 
     def reachSupport(worldMap: WorldMap): Boolean
 
@@ -44,14 +44,14 @@ object Order {
       case _ => false
     }
 
-    def existsSupportTarget(orders: Seq[Order]): Boolean = {
-      orders.exists {
+    override def findSupportTarget(orders: Seq[Order]): Option[Order] = {
+      orders.find {
         case _: MoveOrder => false
         case h => targetSrc ~~ h.src
       }
     }
 
-    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, targetSrc)
+    override def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, targetSrc)
 
   }
 
@@ -59,18 +59,18 @@ object Order {
     override def toString: String = s"$power: $unitType $src S $targetUnit $from - $to"
 
     override def canSupport(o: Order): Boolean = o match {
-      case m: MoveOrder => from ~~ m.src && to ~~ m.dst
+      case m: MoveOrder => from ~~ m.src && ((to.coast.isEmpty && to ~~ m.dst) || (to.coast.isDefined && to == m.dst))
       case _ => false
     }
 
-    def existsSupportTarget(orders: Seq[Order]): Boolean = {
-      orders.exists {
+    override def findSupportTarget(orders: Seq[Order]): Option[Order] = {
+      orders.find {
         case m: MoveOrder => canSupport(m)
         case _ => false
       }
     }
 
-    def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, to)
+    override def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, to)
 
   }
 
