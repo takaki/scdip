@@ -95,14 +95,17 @@ case class Location(province: Province, coast: Option[Coast]) {
   def ~~:(province: Province): Boolean = this.province == province
 
   def setCoast(unitType: UnitType): Location = {
-    coast.fold(copy(coast = Option(unitType.defaultCoast)))(_ => this)
+    unitType match {
+      case Army => copy(coast = Option(Coast.Land))
+      case Fleet => coast.fold(copy(coast = Option(Coast.Single)))(_ => this)
+    }
   }
 
   def setDstCoast(t: UnitType, src: Location, worldMap: WorldMap): Location = {
-    coast.fold(t match {
+    t match {
       case Army => setCoast(t)
-      case Fleet => worldMap.connected(src.setCoast(t), this.province).getOrElse(this)
-    })(_ => this)
+      case Fleet => coast.fold(worldMap.connected(src.setCoast(t), this.province).getOrElse(this))(_ => this)
+    }
   }
 }
 
