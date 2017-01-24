@@ -65,7 +65,7 @@ object Order {
 
     def existsSupportTarget(orders: Seq[Order]): Boolean = {
       orders.exists {
-        case m: MoveOrder => from ~~ m.src && to ~~ m.dst
+        case m: MoveOrder => canSupport(m)
         case _ => false
       }
     }
