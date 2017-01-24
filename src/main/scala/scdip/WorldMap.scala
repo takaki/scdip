@@ -1,5 +1,7 @@
 package scdip
 
+import scdip.UnitType.{Army, Fleet}
+
 import scala.collection.immutable.{Seq, TreeMap}
 import scala.xml.{Elem, NodeSeq}
 import scalax.collection.Graph
@@ -83,8 +85,8 @@ case class Province(fullName: String, shortName: String) {
 
 
 case class Location(province: Province, coast: Option[Coast]) {
-
   override def toString: String = s"$province-${coast.fold("?")(_.toString)}"
+
 
   def ~~(location: Location): Boolean = this.province == location.province
 
@@ -94,6 +96,13 @@ case class Location(province: Province, coast: Option[Coast]) {
 
   def setCoast(unitType: UnitType): Location = {
     coast.fold(copy(coast = Option(unitType.defaultCoast)))(_ => this)
+  }
+
+  def setDstCoast(t: UnitType, src: Location, worldMap: WorldMap): Location = {
+    coast.fold(t match {
+      case Army => setCoast(t)
+      case Fleet => worldMap.connected(src.setCoast(t), this.province).getOrElse(this)
+    })(_ => this)
   }
 }
 
@@ -134,6 +143,15 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   def location(shortName: String): Location = {
     val s = shortName.split("-", 2)
     locationMap(Location(provinceMap(s(0)), Coast.parse(s(1))).toString)
+  }
+
+  def connected(src: Location, dst: Province): Option[Location] = {
+    val connected = diEdges.filter(p => p.from == src && p.to.province == dst)
+    if (connected.size == 1) {
+      Option(connected.head.to)
+    } else {
+      None
+    }
   }
 
   def isNeighbour(from: Location, to: Location): Boolean = {

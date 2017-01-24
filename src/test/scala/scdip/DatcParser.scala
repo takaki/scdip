@@ -86,7 +86,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
   def holdOrder: Parser[(Power) => HoldOrder] = unittype ~ location <~ ("(?i)HOLD".r | "H") ^^ { case (t ~ s) => HoldOrder(_: Power, t, s.setCoast(t)) }
 
   def moveOrder: Parser[(Power) => MoveOrder] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d ~ c) => MoveOrder(_: Power, t, s.setCoast(t), d.setCoast(t))
+    case (t ~ s ~ d ~ c) => MoveOrder(_: Power, t, s.setCoast(t), d.setDstCoast(t, s, worldMap))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"

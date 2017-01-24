@@ -70,6 +70,14 @@ class WorldMapSpecs extends Specification {
       worldMap.canConvoy(lon, lvn) must beTrue
       worldMap.canConvoy(lvp, iri) must beFalse
     }
+    "connected" >> {
+      val gasMv = worldMap.location("gas-xc")
+      val spa = worldMap.province("spa")
+      val spaNc = worldMap.location("spa-nc")
+
+      worldMap.connected(gasMv, spa) must beSome(spaNc)
+
+    }
   }
 
 }
