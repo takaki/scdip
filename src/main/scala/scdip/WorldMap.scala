@@ -83,6 +83,7 @@ case class Province(fullName: String, shortName: String) {
 
 
 case class Location(province: Province, coast: Coast) {
+
   override def toString: String = s"$province-$coast"
 
   def ~~(location: Location): Boolean = this.province == location.province

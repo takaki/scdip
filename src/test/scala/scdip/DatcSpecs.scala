@@ -19,7 +19,8 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get
-    Fragments.foreach(datcs.slice(17,18))(d => d.title >> {
+//    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
+      Fragments.foreach(datcs.slice(21,25))(d => d.title >> {
       Fragments.foreach(d.runTest)(t => t._1 >> {
         t._2.apply()
       })

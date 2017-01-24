@@ -47,13 +47,13 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def prestateResults: Parser[List[OrderResult]] = "PRESTATE_RESULTS" ~> LF ~> rep(result)
 
-  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => f(o.power, o) }
+  def result: Parser[OrderResult] = flag ~ order <~ rep1(LF) ^^ { case (f ~ o) => f(o) }
 
-  def flag: Parser[(Power, Order) => OrderResult] = (success | failure) <~ ":"
+  def flag: Parser[(Order) => OrderResult] = (success | failure) <~ ":"
 
   def success: Parser[SuccessResult.type] = "SUCCESS" ^^ { _ => SuccessResult }
 
-  def failure: Parser[FailureResult.type] = "FAILURE" ^^ { _ => FailureResult }
+  def failure: Parser[(OrderBase) => FailureResult] = "FAILURE" ^^ { _ => FailureResult(_: OrderBase, None) }
 
   def casename: Parser[String] = "CASE" ~> ".+".r <~ LF ^^ { result => result }
 

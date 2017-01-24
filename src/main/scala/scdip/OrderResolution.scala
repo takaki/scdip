@@ -8,8 +8,10 @@ import scdip.UnitType.{Army, Fleet}
 // ref: http://www.floc.net/dpjudge/?page=Algorithm
 
 object OrderState {
-  def steps(orderState: OrderState): OrderState = {
-    step6to9(step4to5(step3(step2(step1(orderState)))))
+  def steps(orderState: OrderState): OrderResults = {
+    val os = step6to9(step4to5(step3(step2(step1(orderState)))))
+    OrderResults(os.orders.map(o => os.getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
+      os.supportRecord, os.convoyingArmies, os.convoySucceeded)
   }
 
   // Step 1. Mark All Invalid Convoy Orders
@@ -64,19 +66,19 @@ object OrderState {
   }
 
   private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, after: ((OrderState) => OrderState) = identity): OrderState = {
-    def cond0(os: OrderState, s: SupportOrder): Boolean = {
-      os.markRecord.getMark(s).fold(true)(m => !m.isInstanceOf[CutMark] && !m.isInstanceOf[VoidMark])
+    def cond1(os: OrderState, s: SupportOrder): Boolean = {
+      os.getMark(s).fold(true)(m => !m.isInstanceOf[CutMark] && !m.isInstanceOf[VoidMark])
     }
 
     orderState.supports.foldLeft(orderState) {
-      case (os, s) if moveOrder.dst ~~ s.src => if (cond0(os, s) && s.power != moveOrder.power &&
+      case (os, s) if moveOrder.dst ~~ s.src => if (cond1(os, s) && s.power != moveOrder.power &&
         (!moveOrder.requireConvoy(orderState.worldMap) ||
           moveOrder.requireConvoy(orderState.worldMap) && os.supportRecord.supportTarget(s).fold(true) {
             case (c: ConvoyOrder) if os.isConvoyFleet(c) => false
             case _ => true
           })) s match {
-        case sh: SupportHoldOrder => after(os.setMark(sh, CutMark()).setSupportRecord(os.supportRecord.delSupport(sh)))
-        case sm: SupportMoveOrder => after(os.setMark(sm, CutMark()).setSupportRecord(os.supportRecord.delSupport(sm).delNoHelpList(sm)))
+        case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"by $moveOrder")).setSupportRecord(os.supportRecord.delSupport(sh)))
+        case sm: SupportMoveOrder => after(os.setMark(sm, CutMark(s"by $moveOrder")).setSupportRecord(os.supportRecord.delSupport(sm).delNoHelpList(sm)))
       } else {
         os
       }
@@ -327,6 +329,11 @@ object OrderState {
 
 }
 
+case class OrderResults(orderResults: Seq[OrderResult],
+                        supportRecord: SupportRecord,
+                        convoyingArmies: ConvoyingArmies,
+                        convoySucceeded: ConvoySucceeded) {
+}
 
 case class OrderState(orders: Seq[Order],
                       worldMap: WorldMap,
@@ -346,9 +353,7 @@ case class OrderState(orders: Seq[Order],
   def isConvoySuccess(moveOrder: MoveOrder): Boolean = convoySucceeded.isConvoySuccess(moveOrder)
 
 
-  def resolve: OrderState = {
-    OrderState.steps(this)
-  }
+  def resolve: OrderResults = OrderState.steps(this)
 
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
 
@@ -358,9 +363,6 @@ case class OrderState(orders: Seq[Order],
 
   def convoys: Seq[ConvoyOrder] = orders.collect { case o: ConvoyOrder => o }
 
-  def results: Seq[OrderResult] = {
-    orders.map(o => if (notMarked(o)) o.success else o.failure)
-  }
 
   // combat list
   val combatListRecord = CombatListRecord(orders) // TODO: instance
@@ -416,7 +418,7 @@ case class OrderState(orders: Seq[Order],
 }
 
 trait OrderResult {
-  def power: Power
+  def power: Power = order.power
 
   def order: OrderBase
 
@@ -425,15 +427,19 @@ trait OrderResult {
   def run[T](f: OrderBase => T): Option[T]
 
   def flatRun[T](f: OrderBase => Option[T]): Option[T]
+
+  def mark: Option[OrderMark]
 }
 
-case class SuccessResult(power: Power, order: OrderBase) extends OrderResult {
+case class SuccessResult(order: OrderBase) extends OrderResult {
   override def run[T](f: (OrderBase) => T): Option[T] = Option(f(order))
 
   override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = f(order)
+
+  def mark = None
 }
 
-case class FailureResult(power: Power, order: OrderBase) extends OrderResult {
+case class FailureResult(order: OrderBase, mark: Option[OrderMark] = None) extends OrderResult {
   override def run[T](f: (OrderBase) => T): Option[T] = None
 
   override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = None

@@ -97,9 +97,9 @@ sealed trait OrderBase {
 
   def src: Location
 
-  def success = SuccessResult(power, this)
+  def success = SuccessResult( this)
 
-  def failure = FailureResult(power, this)
+  def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
 
   def toGameUnit: GameUnit = GameUnit(power, unitType)
 
