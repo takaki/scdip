@@ -136,7 +136,7 @@ object OrderState {
     def impl0(orderState: OrderState) = {
       orderState.convoyAllTargets.foldLeft(orderState) { case (os, m) =>
         if (os.markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
-          impl1(os.setMark(m, NoConvoy()).setSupportRecord(os.supportRecord.delSupportTarget(m)), m)
+          impl1(os.setMark(m, NoConvoy("step5-impl0")).setSupportRecord(os.supportRecord.delSupportTarget(m)), m)
         } else {
           if (os.markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
             (cutSupport(_: OrderState, m)).andThen(impl2(_: OrderState, m))(os.setMarkRecord(os.markRecord.delMark(m)))
@@ -148,7 +148,7 @@ object OrderState {
     }
 
     def impl1(orderState: OrderState, m: MoveOrder): OrderState = {
-      orderState.convoyFleets(m).foldLeft(orderState) { case (os, c) => os.setMark(c, NoConvoy()) }
+      orderState.convoyFleets(m).foldLeft(orderState) { case (os, c) => os.setMark(c, NoConvoy("step5-impl1")) }
     }
 
     def impl2(orderState: OrderState, m: MoveOrder): OrderState = {
@@ -298,19 +298,18 @@ object OrderState {
 
   }
 
-  case class CombatListRecord(_orders: Seq[Order]) {
+  case class CombatListRecord(_orders: Seq[Order], markRecord: MarkRecord) {
     private val map = _orders.map {
-      case (m: MoveOrder) => m -> m.dst.province
+      case (m: MoveOrder) if markRecord.getMark(m).isEmpty=> m -> m.dst.province
+      case (m: MoveOrder) => m -> m.src.province
       case (o) => o -> o.src.province
     }.toMap
+
+    val provinces: Seq[Province] = map.values.toSeq.distinct
 
     def orders(province: Province): Seq[Order] = map.collect {
       case (o, p) if p == province => o
     }.toSeq
-
-    def provinces: Seq[Province] = {
-      map.values.toSeq.distinct
-    }
 
   }
 
@@ -383,7 +382,7 @@ case class OrderState(orders: Seq[Order],
 
 
   // combat list
-  val combatListRecord = CombatListRecord(orders) // TODO: instance
+  val combatListRecord = CombatListRecord(orders, markRecord) // TODO: instance
 
   // mark
   def setMarkRecord(markRecord: MarkRecord): OrderState = {
