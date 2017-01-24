@@ -20,9 +20,10 @@ class DatcSpecs extends Specification {
 
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set("6.B.10", "6.B.11", "6.B.14").contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 27
+    val sep = 31
+    val end = 35
     "2nd" >> {
-      Fragments.foreach(datcs.slice(sep, 30))(d => d.title >> {
+      Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {
           t._2.apply()
         })

@@ -41,7 +41,12 @@ case class MovementState(turn: Turn,
       val (s, f) = moves.partition(m => unitLocation.isEmpty(m.dst))
       if (s.isEmpty && f.nonEmpty) {
         //        throw new RuntimeException(s"infinite loop $unitLocation $s $f ")
-        unitLocation
+        // TODO: circular???
+        f.foldLeft(f.foldLeft(unitLocation){
+          case(u,m) => u.clear(m.src)
+        }){
+          case(u,m) => u.updated(UnitState(m.dst,m.toGameUnit))
+        }
       } else {
         move(s.foldLeft(unitLocation) {
           case (u, m) => u.clear(m.src).updated(UnitState(m.dst, m.toGameUnit))
