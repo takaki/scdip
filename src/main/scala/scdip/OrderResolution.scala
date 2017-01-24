@@ -61,10 +61,13 @@ object OrderState {
           }
         case (os, s: SupportMoveOrder) =>
           s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target"))) {
-            case (m: MoveOrder) => os.addSupport(m, s).addNoHelpList(m, s)
+            case (m: MoveOrder) => if (os.orders.exists(o => o.src ~~ m.dst && o.power == s.power)) {
+              os.addSupport(m, s).addNoHelpList(m, s)
+            } else {
+              os.addSupport(m, s)
+            }
             case _ => os
           }
-
       }
     }
 
@@ -227,11 +230,14 @@ object OrderState {
         Seq.empty
       }
     }).foldLeft(orderState) {
-      case (os, m) => orderState.orders.find(o => o.src ~~ m.dst).fold(os) {
-        case (m: MoveOrder) if orderState.notMarked(m) => os
-        case o if o.power == m.power => step6to8(bounce(os, m, "step8"))
-        case o if orderState.supportRecord.supportCountNH(m) > 0 => os
-        case _ => os
+      case (os, m) => os.orders.find(h => h.src ~~ m.dst).fold(os) {
+        case (o: MoveOrder) if orderState.notMarked(o) => os
+        case nm if nm.power == m.power => step6to8(bounce(os, m, "step8 self-attack"))
+        case nm => if (os.supportRecord.supportCountNH(m) > os.combatListRecord.orders(m.dst.province).filterNot(o => o == m).map(o => os.supportCount(o)).reduceOption(_ max _).getOrElse(0)) {
+          os
+        } else {
+          step6to8(bounce(os, m, "step8-NH"))
+        }
       }
     }
   }
@@ -300,7 +306,7 @@ object OrderState {
 
   case class CombatListRecord(_orders: Seq[Order], markRecord: MarkRecord) {
     private val map = _orders.map {
-      case (m: MoveOrder) if markRecord.getMark(m).isEmpty=> m -> m.dst.province
+      case (m: MoveOrder) if markRecord.getMark(m).isEmpty => m -> m.dst.province
       case (m: MoveOrder) => m -> m.src.province
       case (o) => o -> o.src.province
     }.toMap
