@@ -110,11 +110,11 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
-  def location: Parser[Location] = province ~ opt(coast) ^^ { case (p ~ c) => Location(p, c.getOrElse(Coast.Undefined)) }
+  def location: Parser[Location] = province ~ opt(coast) ^^ { case (p ~ c) => Location(p, c.flatten) }
 
   def province: Parser[Province] = "[A-Za-z]+".r ^^ { result => worldMap.province(result) }
 
-  def coast: Parser[Coast] = (("/" ~> "[a-z]+".r) | ("(" ~> "[a-z]+".r <~ ")")) ^^ { result => Coast.parse(result) }
+  def coast: Parser[Option[Coast]] = (("/" ~> "[a-z]+".r) | ("(" ~> "[a-z]+".r <~ ")")) ^^ { result => Coast.parse(result) }
 
 
 }

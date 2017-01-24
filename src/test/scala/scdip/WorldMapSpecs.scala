@@ -25,7 +25,7 @@ class WorldMapSpecs extends Specification {
       val lonMv = worldMap.location("lon-mv")
       val nthXc = worldMap.location("nth-xc")
       val lvpMv = worldMap.location("lvp-mv")
-      val iriMv = Location(worldMap.province("iri"), Coast.Land)
+      val iriMv = Location(worldMap.province("iri"), Option(Coast.Land))
       worldMap.isNeighbour(mosMv, ukrMv) must beTrue
       worldMap.isNeighbour(mosMv, lonMv) must beFalse
       worldMap.isNeighbour(nthXc, lonMv) must beFalse

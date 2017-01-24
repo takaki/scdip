@@ -61,7 +61,7 @@ case class Variant(name: String,
     val owner = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._3 == "none") None else Option(power(d._3)))).toMap
     val map = initialState.map(d => {
       val unitType = UnitType.parse(d._3)
-      val coast = if (d._4.isEmpty) unitType.defaultCoast else Coast.parse(d._4)
+      val coast:Option[Coast] = if (d._4.isEmpty) Option(unitType.defaultCoast) else Coast.parse(d._4)
       Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
     }).toMap
 
@@ -104,7 +104,7 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 }
 
 case class UnitState(location: Location, gameUnit: GameUnit) {
-  require(location.coast != Coast.Undefined)
+  require(location.coast.isDefined)
 
   override def toString: String = s"$gameUnit $location"
 

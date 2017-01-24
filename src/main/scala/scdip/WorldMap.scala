@@ -12,10 +12,10 @@ object Coast {
     override val isSea: Boolean = true
   }
 
-  case object Undefined extends Coast {
-    override def defaultCoast: Coast = Undefined
+  case object AnyCoast extends Coast {
+    override def defaultCoast: Coast = AnyCoast
 
-    val abbreviation: String = "?"
+    val abbreviation: String = "*"
   }
 
   case object Wing extends Coast {
@@ -50,16 +50,16 @@ object Coast {
     val abbreviation: String = "ec"
   }
 
-  def parse(input: String): Coast = {
+  def parse(input: String): Option[Coast] = {
     input match {
-      case "wx" => Wing
-      case "mv" => Land
-      case "xc" => Single
-      case "nc" => North
-      case "sc" => South
-      case "wc" => West
-      case "ec" => East
-      case _ => Undefined
+      case "wx" => Option(Wing)
+      case "mv" => Option(Land)
+      case "xc" => Option(Single)
+      case "nc" => Option(North)
+      case "sc" => Option(South)
+      case "wc" => Option(West)
+      case "ec" => Option(East)
+      case _ => None
     }
   }
 }
@@ -82,9 +82,9 @@ case class Province(fullName: String, shortName: String) {
 }
 
 
-case class Location(province: Province, coast: Coast) {
+case class Location(province: Province, coast: Option[Coast]) {
 
-  override def toString: String = s"$province-$coast"
+  override def toString: String = s"$province-${coast.fold("?")(_.toString)}"
 
   def ~~(location: Location): Boolean = this.province == location.province
 
@@ -93,7 +93,7 @@ case class Location(province: Province, coast: Coast) {
   def ~~:(province: Province): Boolean = this.province == province
 
   def setCoast(unitType: UnitType): Location = {
-    if (coast == Coast.Undefined) copy(coast = unitType.defaultCoast) else this
+    coast.fold(copy(coast = Option(unitType.defaultCoast)))(_ => this)
   }
 }
 
@@ -105,15 +105,15 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   private val graph: Graph[Location, DiEdge] = Graph.from(edges = diEdges)
   private val provinces = diEdges.map(de => de.from.province).distinct
 
-  private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.isLand).map(de => de.from.province).toSet
-  private val fleetProvinces: Set[Province] = diEdges.filter(de => de.from.coast.isSea).map(de => de.from.province).toSet
+  private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.fold(false)(_.isLand)).map(de => de.from.province).toSet
+  private val fleetProvinces: Set[Province] = diEdges.filter(de => de.from.coast.fold(false)(_.isSea)).map(de => de.from.province).toSet
 
   private val seaProvinces = fleetProvinces -- armyProvinces
   private val landProvinces = armyProvinces -- fleetProvinces
   private val coastalProvinces = armyProvinces & fleetProvinces
 
-  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.isLand)
-  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.isSea)
+  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.fold(false)(_.isLand))
+  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.fold(false)(_.isSea))
 
   private val armyGraph: Graph[Location, DiEdge] = Graph.from(edges = armyEdges)
   private val fleetGraph: Graph[Location, DiEdge] = Graph.from(edges = fleetEdges)
@@ -149,13 +149,13 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   def canConvoy(from: Province, to: Province, convoys: Set[Province] = seaProvinces): Boolean = {
     if (coastalProvinces.contains(from) && coastalProvinces.contains(to)) {
-      val fromCoast = graph.nodes.filter(n => n.province == from && n.coast.isSea).map(n => DiEdge(Location(n.province, Coast.Land), n.value))
-      val toCoast = graph.nodes.filter(n => n.province == to && n.coast.isSea).map(n => DiEdge(n.value, Location(n.province, Coast.Land)))
-      val fromEdge = diEdges.filter(e => e.from.province == from && e.from.coast.isSea)
+      val fromCoast = graph.nodes.filter(n => n.province == from && n.coast.fold(false)(_.isSea)).map(n => DiEdge(Location(n.province, Option(Coast.Land)), n.value))
+      val toCoast = graph.nodes.filter(n => n.province == to && n.coast.fold(false)(_.isSea)).map(n => DiEdge(n.value, Location(n.province, Option(Coast.Land))))
+      val fromEdge = diEdges.filter(e => e.from.province == from && e.from.coast.fold(false)(_.isSea))
       val gSeaPlus = convoyGraph(convoys) ++ fromCoast ++ fromEdge ++ toCoast
       val path = for {
-        n0 <- gSeaPlus find Location(from, Coast.Land)
-        n1 <- gSeaPlus find Location(to, Coast.Land)
+        n0 <- gSeaPlus find Location(from, Option(Coast.Land))
+        n1 <- gSeaPlus find Location(to, Option(Coast.Land))
         path <- n0 pathTo n1
       } yield path
       path.isDefined
@@ -184,7 +184,7 @@ object WorldMap {
           (ad \@ "refs").split(" ").map(_.split("-")).map { a =>
             (Location(provinceMap(p \@ "shortname"), Coast.parse(ad \@ "type")),
               Location(provinceMap(a(0)), if (a.length == 1) {
-                Coast.parse(ad \@ "type").defaultCoast
+                Coast.parse(ad \@ "type").map(_.defaultCoast)
               } else {
                 Coast.parse(a(1))
               }))
