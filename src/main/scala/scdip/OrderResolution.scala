@@ -55,12 +55,12 @@ object OrderState {
     def check1(orderState: OrderState): OrderState = {
       orderState.supports.filter(orderState.notMarked(_)).foldLeft(orderState) {
         case (os, s: SupportHoldOrder) =>
-          s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target"))) {
-            case (m: NonMoveOrder) => os.addSupport(m, s)
+          s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
+            case (nm: NonMoveOrder) => os.addSupport(nm, s)
             case _ => os
           }
         case (os, s: SupportMoveOrder) =>
-          s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target"))) {
+          s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target(sm)"))) {
             case (m: MoveOrder) => if (os.orders.exists(o => o.src ~~ m.dst && o.power == s.power)) {
               os.addSupport(m, s).addNoHelpList(m, s)
             } else {
@@ -84,7 +84,7 @@ object OrderState {
     })
   }
 
-  private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity): OrderState = {
+  private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity, inStep9: Boolean = false): OrderState = {
     def cond1(os: OrderState, s: SupportOrder): Boolean = {
       os.getMark(s).fold(true)(m => !m.isInstanceOf[CutMark] && !m.isInstanceOf[VoidMark])
     }
@@ -97,7 +97,7 @@ object OrderState {
             case _ => true
           })) s match {
         case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).setSupportRecord(os._supportRecord.delSupport(sh)))
-        case sm: SupportMoveOrder => if (sm.to ~~ moveOrder.src) {
+        case sm: SupportMoveOrder => if (!inStep9 && sm.to ~~ moveOrder.src) {
           os
         } else {
           after(os.setMark(sm, CutMark(s"$message; $moveOrder")).setSupportRecord(os._supportRecord.delSupport(sm).delNoHelpList(sm)))
@@ -254,7 +254,7 @@ object OrderState {
   // Step 9. Mark Supports Cut By Dislodgements
   private def step9(orderState: OrderState): OrderState = {
     orderState.moves.filter(o => orderState.notMarked(o)).foldLeft(orderState) {
-      case (os, m) => cutSupport(os, m, "step9", step6to9)
+      case (os, m) => cutSupport(os, m, "step9", step6to9, inStep9 = true)
     }
   }
 
