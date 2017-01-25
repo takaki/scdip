@@ -18,10 +18,17 @@ class DatcSpecs extends Specification {
     val variant = variants.variant("Standard [No Units]").get
     val parsers = DatcParser(variant)
 
-    val datcs = parsers.parse(txt).right.get.filterNot(p => Set("6.B.10", "6.B.11", "6.B.14", "6.D.8", "6.D.18").contains(p.title))
+    val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
+      "6.B.10" // wrong coast
+      , "6.B.11" // wrong coast
+      , "6.B.14" //adjustment
+      , "6.D.8" // destroyed
+      , "6.D.18" // destroyed
+      , "6.D.34" // destroyed
+    ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 59
-    val end = 69
+    val sep = 65
+    val end = 67
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {

@@ -8,10 +8,8 @@ import scdip.UnitType.{Army, Fleet}
 // ref: http://www.floc.net/dpjudge/?page=Algorithm
 
 object OrderState {
-  def steps(orderState: OrderState): OrderResults = {
-    val os = step6to9(step4to5(step3(step2(step1(orderState)))))
-    OrderResults(os.orders.map(o => os.getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
-      os._supportRecord, os._convoyingArmies, os._convoySucceeded, os._combatListRecord)
+  def steps(orderState: OrderState): OrderState = {
+    step10(step6to9(step4to5(step3(step2(step1(orderState))))))
   }
 
   // Step 1. Mark All Invalid Convoy Orders
@@ -56,8 +54,8 @@ object OrderState {
       orderState.supports.filter(orderState.notMarked(_)).foldLeft(orderState) {
         case (os, s: SupportHoldOrder) =>
           s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
-            case (nm:NonMoveOrder) => os.addSupport(nm, s)
-            case (m:MoveOrder) if ! os.notMarked(m)=> os.addSupport(m, s)
+            case (nm: NonMoveOrder) => os.addSupport(nm, s)
+            case (m: MoveOrder) if !os.notMarked(m) => os.addSupport(m, s)
             case _ => os
           }
         case (os, s: SupportMoveOrder) =>
@@ -260,13 +258,55 @@ object OrderState {
     }
   }
 
+  //Step 10. Move Units That Did Not Bounce
+  private def step10(orderState: OrderState): OrderState = {
+    @scala.annotation.tailrec
+    def unbounce(orderState: OrderState, province: Province): OrderState = {
+      val orders = orderState._combatListRecord.orders(province)
+      if (orders.isEmpty) {
+        orderState
+      } else {
+        val (_, maximum) = orders.map(o => (o, orderState.supportCount(o))).groupBy { case (_, sc) => sc }.maxBy { case (sc, _) => sc }
+        if (maximum.size == 1) {
+          val (max, _) = maximum.head
+          if (orderState.getMark(max).fold(false)(_.isInstanceOf[Bounce])) {
+            val os2 = orderState.delMark(max)
+            if (os2.isDislodged(max)) {
+              os2.delDislodged(max)
+            } else {
+              unbounce(os2.delCombatList(province, max), province)
+            }
+          } else {
+            orderState
+          }
+        } else {
+          orderState
+        }
+      }
+    }
+
+    val dislodgedPairs = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
+      case (o: NonMoveOrder) if m.dst ~~ o.src => true
+      case (o) if !orderState.notMarked(o) && m.dst ~~ o.src => true
+      case _ => false
+    }.map(o => (m, o)))
+    val os2 = dislodgedPairs.foldLeft(orderState) {
+      case (os, (m, o: MoveOrder)) if !m.requireConvoy(os.worldMap) && !o.requireConvoy(os.worldMap) && m.src ~~ o.dst =>
+        os.delCombatList(o).addDislodged(o)
+      case (os, _) => os
+    }
+    dislodgedPairs.foldLeft(os2){
+      case(os, (m, _)) => unbounce(os, m.src.province)
+    }
+    // retreat list
+  }
 
   case class MarkRecord(_orderMark: Map[Order, OrderMark] = Map.empty) {
     def setMark(order: Order, mark: OrderMark): MarkRecord = {
       copy(_orderMark = _orderMark + (order -> mark))
     }
 
-    def delMark(m: MoveOrder): MarkRecord = copy(_orderMark = _orderMark - m)
+    def delMark(o: Order): MarkRecord = copy(_orderMark = _orderMark - o)
 
     def getMark(order: Order): Option[OrderMark] = _orderMark.get(order)
   }
@@ -324,12 +364,19 @@ object OrderState {
 
   }
 
-  case class CombatListRecord(map: Map[Province, List[Order]] = Map.empty) {
+  case class CombatListRecord(map: Map[Province, Set[Order]] = Map.empty) {
+
     val provinces: Seq[Province] = map.keys.toSeq
 
-    def orders(province: Province): Seq[Order] = map(province)
+    def orders(province: Province): Seq[Order] = map.get(province).fold(Seq.empty[Order])(_.toSeq)
 
-    def add(province: Province, order: Order): CombatListRecord = copy(map = map.updated(province, order :: map.getOrElse(province, List.empty)))
+    def add(province: Province, order: Order): CombatListRecord = copy(map = map.updated(province, map.getOrElse(province, Set.empty) + order))
+
+    def del(o: MoveOrder): CombatListRecord = copy(map = map.updated(o.dst.province, map.getOrElse(o.dst.province, Set.empty) - o))
+
+    def del(province: Province, order: Order): CombatListRecord = copy(map = map.updated(province, map(province) - order))
+
+    def toSeq: Seq[(Province, Set[Order])] = map.toSeq
 
   }
 
@@ -356,6 +403,13 @@ object OrderState {
     def isConvoySuccess(m: MoveOrder): Boolean = _convoySucceeded.contains(m)
   }
 
+  case class DislodgedList(orders: Set[Order] = Set.empty) {
+    def add(order: Order): DislodgedList = copy(orders = orders + order)
+
+    def del(order: Order): DislodgedList = copy(orders = orders - order)
+
+    def contains(order: Order): Boolean = orders.contains(order)
+  }
 
 }
 
@@ -363,7 +417,8 @@ case class OrderResults(results: Seq[OrderResult],
                         supportRecord: SupportRecord,
                         convoyingArmies: ConvoyingArmies,
                         convoySucceeded: ConvoySucceeded,
-                        combatListRecord: CombatListRecord) {
+                        combatListRecord: CombatListRecord,
+                        dislodgedList: DislodgedList) {
 }
 
 case class OrderState(orders: Seq[Order],
@@ -372,10 +427,16 @@ case class OrderState(orders: Seq[Order],
                       _supportRecord: SupportRecord = SupportRecord(),
                       _convoyingArmies: ConvoyingArmies = ConvoyingArmies(),
                       _convoySucceeded: ConvoySucceeded = ConvoySucceeded(),
-                      _combatListRecord: CombatListRecord = CombatListRecord()) {
+                      _combatListRecord: CombatListRecord = CombatListRecord(),
+                      _dislodgedList: DislodgedList = DislodgedList()) {
 
 
-  def resolve: OrderResults = OrderState.steps(this)
+  def resolve: OrderResults = {
+    val os = OrderState.steps(this)
+    OrderResults(os.orders.map(o => os.getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
+      _supportRecord, _convoyingArmies, _convoySucceeded, _combatListRecord, _dislodgedList)
+
+  }
 
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
 
@@ -395,8 +456,8 @@ case class OrderState(orders: Seq[Order],
   def notMarked(order: Order): Boolean = _markRecord.getMark(order).isEmpty
 
 
-  def delMark(m: MoveOrder): OrderState = {
-    copy(_markRecord = _markRecord.delMark(m))
+  def delMark(o: Order): OrderState = {
+    copy(_markRecord = _markRecord.delMark(o))
   }
 
   // support
@@ -459,6 +520,16 @@ case class OrderState(orders: Seq[Order],
 
   def addCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.add(province, order))
 
+  def delCombatList(o: MoveOrder): OrderState = copy(_combatListRecord = _combatListRecord.del(o))
+
+  def delCombatList(province: Province, order: Order) = copy(_combatListRecord = _combatListRecord.del(province, order))
+
+  // dislodged list
+  def addDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.add(order))
+
+  def delDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.del(order))
+
+  def isDislodged(order: Order): Boolean = _dislodgedList.contains(order)
 }
 
 trait OrderResult {
