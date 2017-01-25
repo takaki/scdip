@@ -183,9 +183,9 @@ object OrderState {
       swapper <- orderState.moves if orderState.notMarked(swapper) && swapper.dst ~~ m.src && swapper.src ~~ m.dst && !swapper.requireConvoy(orderState.worldMap)
     } yield (m, swapper)).foldLeft(orderState) {
       case (os, (m, sw)) => if (m.power == sw.power || os.supportCountNH(m) <= os.supportCount(sw)) {
-        step6(bounce(os, m, "step6"))
+        step6(bounce(os, m, s"step6 by $sw"))
       } else if (m.power == sw.power || os.supportCountNH(sw) <= os.supportCount(m)) {
-        step6(bounce(os, sw, "step6"))
+        step6(bounce(os, sw, s"step6 by $m"))
       } else {
         os
       }
@@ -194,7 +194,7 @@ object OrderState {
 
   private def bounce(orderState: OrderState, moveOrder: MoveOrder, message: String = ""): OrderState = {
     orderState.setMark(moveOrder, Bounce(message))
-      .delNoHelpTarget(moveOrder).delSupportTarget(moveOrder)
+      //      .delNoHelpTarget(moveOrder).delSupportTarget(moveOrder)
       .addCombatList(moveOrder.src.province, moveOrder)
   }
 
@@ -214,7 +214,10 @@ object OrderState {
   private def step7(orderState: OrderState): OrderState = {
     val bounced = orderState._combatListRecord.provinces.flatMap(province => {
       orderState._combatListRecord.orders(province).collect { case (m: MoveOrder) if orderState.notMarked(m) => m }.filter(m =>
-        orderState._combatListRecord.orders(province).filter(o => o != m).exists(o => orderState.supportCount(o) >= orderState.supportCount(m))
+        orderState._combatListRecord.orders(province).filter(o => o != m).exists {
+          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src.province == province => 0 >= orderState.supportCount(m)
+          case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
+        }
       )
     })
     if (bounced.isEmpty) {
@@ -295,8 +298,8 @@ object OrderState {
         os.delCombatList(o).addDislodged(o)
       case (os, _) => os
     }
-    dislodgedPairs.foldLeft(os2){
-      case(os, (m, _)) => unbounce(os, m.src.province)
+    dislodgedPairs.foldLeft(os2) {
+      case (os, (m, _)) => unbounce(os, m.src.province)
     }
     // retreat list
   }
@@ -336,8 +339,10 @@ object OrderState {
 
     def supportCount(order: Order, markRecord: MarkRecord): Int = order match {
       case (o: NonMoveOrder) => _holdCount.count { case (k, v) => v == order }
-      case (m: MoveOrder) if markRecord.getMark(order).isEmpty => _moveCount.count { case (k, v) => v == order }
-      case (m: MoveOrder) => _holdCount.count { case (k, v) => v == order }
+      case (m: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[VoidMark]) => _holdCount.count { case (k, v) => v == order }
+      case (m: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (k, v) => v == order }
+      //      case (m: MoveOrder) if markRecord.getMark(order).isDefined => 0
+      case (m: MoveOrder) => _moveCount.count { case (k, v) => v == order }
     }
 
 
