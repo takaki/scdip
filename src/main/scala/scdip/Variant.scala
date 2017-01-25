@@ -99,7 +99,7 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   }
 
   def filterOrders(orders: Seq[Order]): Seq[Order] = {
-    orders.filter(o => locationUnitMap.exists{case(l, gu) => o.src ~~ l && o.power == gu.power && o.unitType == gu.unitType}) // TODL o.toGameUnit
+    orders.filter(o => locationUnitMap.exists{case(l, gu) => o.src ~~ l && o.toGameUnit == gu}) // TODL o.toGameUnit
   }
 }
 

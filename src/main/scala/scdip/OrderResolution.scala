@@ -18,9 +18,9 @@ object OrderState {
   private def step1(orderState: OrderState): OrderState = {
     def step1moves(orderState: OrderState): OrderState = {
       orderState.moves.foldLeft(orderState) {
-        case (os, m) if m.src ~~ m.dst => os.setMarkRecord(os._markRecord.setMark(m, VoidMark("same province")))
+        case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
         case (os, m) if !m.requireConvoy(orderState.worldMap) => os
-        case (os, m) if m.unitType == Army => if (m.canConvoy(orderState.worldMap, os.orders)) os else os.setMarkRecord(os._markRecord.setMark(m, NoConvoy("no convoy path")))
+        case (os, m) if m.unitType == Army => if (m.canConvoy(orderState.worldMap, os.orders)) os else os.setMark(m, NoConvoy("no convoy path"))
         case (os, m) if m.unitType == Fleet => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
       }
@@ -96,11 +96,11 @@ object OrderState {
             case (c: ConvoyOrder) if os.isConvoyFleet(c) => false
             case _ => true
           })) s match {
-        case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).setSupportRecord(os._supportRecord.delSupport(sh)))
+        case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).delSupport(sh))
         case sm: SupportMoveOrder => if (!inStep9 && sm.to ~~ moveOrder.src) {
           os
         } else {
-          after(os.setMark(sm, CutMark(s"$message; $moveOrder")).setSupportRecord(os._supportRecord.delSupport(sm).delNoHelpList(sm)))
+          after(os.setMark(sm, CutMark(s"$message; $moveOrder")).delSupport(sm).delNoHelpList(sm))
         }
       } else {
         os
@@ -146,10 +146,10 @@ object OrderState {
     def impl0(orderState: OrderState) = {
       orderState.convoyAllTargets.foldLeft(orderState) { case (os, m) =>
         if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
-          impl1(os.setMark(m, NoConvoy("step5-impl0")).setSupportRecord(os._supportRecord.delSupportTarget(m)), m)
+          impl1(os.setMark(m, NoConvoy("step5-impl0")).delSupportTarget(m), m)
         } else {
           if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
-            (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.setMarkRecord(os._markRecord.delMark(m)))
+            (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
           } else {
             os
           }
@@ -194,7 +194,7 @@ object OrderState {
 
   private def bounce(orderState: OrderState, moveOrder: MoveOrder, message: String = ""): OrderState = {
     orderState.setMark(moveOrder, Bounce(message))
-      .setSupportRecord(orderState._supportRecord.delNoHelpTarget(moveOrder).delSupportTarget(moveOrder))
+      .delNoHelpTarget(moveOrder).delSupportTarget(moveOrder)
       .addCombatList(moveOrder.src.province, moveOrder)
   }
 
@@ -363,27 +363,6 @@ case class OrderState(orders: Seq[Order],
                       _convoySucceeded: ConvoySucceeded = ConvoySucceeded(),
                       _combatListRecord: CombatListRecord = CombatListRecord()) {
 
-  def addCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.add(province, order))
-
-
-  def addNoHelpList(m: MoveOrder, s: SupportMoveOrder): OrderState = copy(_supportRecord = _supportRecord.addNoHelpList(m, s))
-
-  def addSupport(o: Order, s: SupportOrder): OrderState = copy(_supportRecord = _supportRecord.addSupport(o, s))
-
-  def supportCount(o: Order): Int = _supportRecord.supportCount(o)
-
-
-  def getMark(order: Order): Option[OrderMark] = _markRecord.getMark(order)
-
-  def notMarked(order: Order): Boolean = _markRecord.getMark(order).isEmpty
-
-
-  def addConvoySucceeded(moveOrder: MoveOrder): OrderState = copy(_convoySucceeded = _convoySucceeded.addConvoySucceeded(moveOrder))
-
-
-  def isConvoySuccess(moveOrder: MoveOrder): Boolean = _convoySucceeded.isConvoySuccess(moveOrder)
-
-
   def resolve: OrderResults = OrderState.steps(this)
 
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
@@ -394,20 +373,35 @@ case class OrderState(orders: Seq[Order],
 
   def convoys: Seq[ConvoyOrder] = orders.collect { case o: ConvoyOrder => o }
 
-
   // mark
-  def setMarkRecord(markRecord: MarkRecord): OrderState = {
-    copy(_markRecord = markRecord)
+  def setMark(order: Order, mark: OrderMark): OrderState = {
+    copy(_markRecord = _markRecord.setMark(order, mark))
   }
 
-  def setMark(order: Order, mark: OrderMark): OrderState = {
-    setMarkRecord(_markRecord.setMark(order, mark))
+  def getMark(order: Order): Option[OrderMark] = _markRecord.getMark(order)
+
+  def notMarked(order: Order): Boolean = _markRecord.getMark(order).isEmpty
+
+
+  def delMark(m: MoveOrder): OrderState = {
+    copy(_markRecord = _markRecord.delMark(m))
   }
 
   // support
-  def setSupportRecord(supportRecord: SupportRecord): OrderState = {
-    copy(_supportRecord = supportRecord)
-  }
+
+  def addSupport(o: Order, s: SupportOrder): OrderState = copy(_supportRecord = _supportRecord.addSupport(o, s))
+
+  def addNoHelpList(m: MoveOrder, s: SupportMoveOrder): OrderState = copy(_supportRecord = _supportRecord.addNoHelpList(m, s))
+
+  def delSupport(s: SupportOrder): OrderState = copy(_supportRecord = _supportRecord.delSupport(s))
+
+  def delNoHelpList(sm: SupportMoveOrder): OrderState = copy(_supportRecord = _supportRecord.delNoHelpList(sm))
+
+  def delSupportTarget(m: MoveOrder): OrderState = copy(_supportRecord = _supportRecord.delSupportTarget(m))
+
+  def delNoHelpTarget(moveOrder: MoveOrder): OrderState = copy(_supportRecord = _supportRecord.delNoHelpTarget(moveOrder))
+
+  def supportCount(o: Order): Int = _supportRecord.supportCount(o)
 
   def uniqueHighestSupportedOrder(province: Province): Option[Order] = {
     val (_, os) = orders.filter {
@@ -442,6 +436,12 @@ case class OrderState(orders: Seq[Order],
   def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = _convoyingArmies.isConvoyFleet(convoyOrder)
 
   // convoy success
+
+  def addConvoySucceeded(moveOrder: MoveOrder): OrderState = copy(_convoySucceeded = _convoySucceeded.addConvoySucceeded(moveOrder))
+
+  def isConvoySuccess(moveOrder: MoveOrder): Boolean = _convoySucceeded.isConvoySuccess(moveOrder)
+
+  def addCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.add(province, order))
 
 }
 
