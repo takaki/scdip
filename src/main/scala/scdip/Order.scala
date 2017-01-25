@@ -45,10 +45,7 @@ object Order {
     }
 
     override def findSupportTarget(orders: Seq[Order]): Option[Order] = {
-      orders.find {
-        case _: MoveOrder => false
-        case h => targetSrc ~~ h.src
-      }
+      orders.find(order => targetSrc ~~ order.src)
     }
 
     override def reachSupport(worldMap: WorldMap): Boolean = worldMap.isReachable(src, targetSrc)
@@ -101,7 +98,7 @@ sealed trait OrderBase {
 
   def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
 
-  def toGameUnit: GameUnit = GameUnit(power, unitType)
+  def gameUnit: GameUnit = GameUnit(power, unitType)
 
 }
 

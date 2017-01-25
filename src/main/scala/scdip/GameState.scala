@@ -45,11 +45,11 @@ case class MovementState(turn: Turn,
         f.foldLeft(f.foldLeft(unitLocation){
           case(u,m) => u.clear(m.src)
         }){
-          case(u,m) => u.updated(UnitState(m.dst,m.toGameUnit))
+          case(u,m) => u.updated(UnitState(m.dst,m.gameUnit))
         }
       } else {
         move(s.foldLeft(unitLocation) {
-          case (u, m) => u.clear(m.src).updated(UnitState(m.dst, m.toGameUnit))
+          case (u, m) => u.clear(m.src).updated(UnitState(m.dst, m.gameUnit))
         }, f)
       }
     }
