@@ -93,14 +93,14 @@ object OrderState {
       case (os, s) if moveOrder.dst ~~ s.src => if (cond1(os, s) && s.power != moveOrder.power &&
         (!moveOrder.requireConvoy(orderState.worldMap) ||
           moveOrder.requireConvoy(orderState.worldMap) && os.supportTarget(s).fold(true) {
-            case (c: ConvoyOrder) if os.isConvoyFleet(c) => false
+            case (m: MoveOrder) if os.convoyFleets(moveOrder).map(c => c.src).contains(m.dst) => false
             case _ => true
           })) s match {
         case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).delSupport(sh))
-        case sm: SupportMoveOrder => if (!inStep9 && sm.to ~~ moveOrder.src) {
-          os
-        } else {
+        case sm: SupportMoveOrder => if (inStep9 || !(sm.to ~~ moveOrder.src)) {
           after(os.setMark(sm, CutMark(s"$message; $moveOrder")).delSupport(sm).delNoHelpList(sm))
+        } else {
+          os
         }
       } else {
         os
@@ -141,13 +141,6 @@ object OrderState {
           os.setMark(m, ConvoyEndangered())
         }
     }
-//    orderState.convoyAllFleets.foldLeft(orderState) {
-//      case (os, c) => os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
-//        os.convoyTarget(c).map(m => os.setMark(m, ConvoyEndangered()))
-//      } else {
-//        None
-//      }).getOrElse(os)
-//    }
   }
 
   // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
