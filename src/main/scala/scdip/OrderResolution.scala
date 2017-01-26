@@ -439,7 +439,7 @@ case class OrderState(orders: Seq[Order],
   def resolve: OrderResults = {
     val os = OrderState.steps(this)
     OrderResults(os.orders.map(o => os.getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
-      _supportRecord, _convoyingArmies, _convoySucceeded, _combatListRecord, _dislodgedList)
+      os._supportRecord, os._convoyingArmies, os._convoySucceeded, os._combatListRecord, os._dislodgedList)
 
   }
 
