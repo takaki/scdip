@@ -132,13 +132,22 @@ object OrderState {
   }
 
   private def checkDisruption(orderState: OrderState): OrderState = {
-    orderState.convoyAllFleets.foldLeft(orderState) {
-      case (os, c) => os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
-        os.convoyTarget(c).map(m => os.setMark(m, ConvoyEndangered()))
-      } else {
-        None
-      }).getOrElse(os)
+    orderState.convoyGroups.foldLeft(orderState) {
+      case (os, (m, cs)) =>
+        val safe = cs.filter(c => os.uniqueHighestSupportedOrder(c.src.province).fold(true)(ho => ho.power == c.power))
+        if (m.canConvoy(os.worldMap, safe.toSeq)) {
+          os
+        } else {
+          os.setMark(m, ConvoyEndangered())
+        }
     }
+//    orderState.convoyAllFleets.foldLeft(orderState) {
+//      case (os, c) => os.uniqueHighestSupportedOrder(c.src.province).flatMap(ho => if (ho.power != c.power) {
+//        os.convoyTarget(c).map(m => os.setMark(m, ConvoyEndangered()))
+//      } else {
+//        None
+//      }).getOrElse(os)
+//    }
   }
 
   // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
@@ -146,7 +155,7 @@ object OrderState {
     def impl0(orderState: OrderState) = {
       orderState.convoyAllTargets.foldLeft(orderState) { case (os, m) =>
         if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
-          impl1(os.setMark(m, NoConvoy("step5-impl0")).delSupportTarget(m), m)
+          impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
         } else {
           if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
             (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
@@ -158,7 +167,7 @@ object OrderState {
     }
 
     def impl1(orderState: OrderState, m: MoveOrder): OrderState = {
-      orderState.convoyFleets(m).foldLeft(orderState) { case (os, c) => os.setMark(c, NoConvoy("step5-impl1")) }
+      orderState.convoyFleets(m).foldLeft(orderState) { case (os, c) => os.setMark(c, NoConvoy("step5-target-endangered")) }
     }
 
     def impl2(orderState: OrderState, m: MoveOrder): OrderState = {
@@ -386,6 +395,8 @@ object OrderState {
   }
 
   case class ConvoyingArmies(_convoyingArmies: Map[ConvoyOrder, MoveOrder] = Map.empty) {
+    def toSeq: Seq[(MoveOrder, Set[ConvoyOrder])] = _convoyingArmies.toSeq.groupBy { case (c, m) => m }.map { case (move, seq) => (move, seq.map { case (c, m) => c }.toSet) }.toSeq
+
     def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {
       copy(_convoyingArmies + (convoyOrder -> moveOrder))
     }
@@ -437,9 +448,12 @@ case class OrderState(orders: Seq[Order],
 
 
   def resolve: OrderResults = {
-    val os = OrderState.steps(this)
-    OrderResults(os.orders.map(o => os.getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
-      os._supportRecord, os._convoyingArmies, os._convoySucceeded, os._combatListRecord, os._dislodgedList)
+    OrderState.steps(this).toOrderResults
+  }
+
+  private def toOrderResults: OrderResults = {
+    OrderResults(orders.map(o => getMark(o).fold[OrderResult](o.success)(m => o.failure(m))),
+      _supportRecord, _convoyingArmies, _convoySucceeded, _combatListRecord, _dislodgedList)
 
   }
 
@@ -514,6 +528,8 @@ case class OrderState(orders: Seq[Order],
   def convoyAllTargets: Set[MoveOrder] = _convoyingArmies.convoyAllTargets
 
   def convoyFleets(moveOrder: MoveOrder): Seq[ConvoyOrder] = _convoyingArmies.convoyFleets(moveOrder)
+
+  def convoyGroups: Seq[(MoveOrder, Set[ConvoyOrder])] = _convoyingArmies.toSeq
 
   def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = _convoyingArmies.isConvoyFleet(convoyOrder)
 
