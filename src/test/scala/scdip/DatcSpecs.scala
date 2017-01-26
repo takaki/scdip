@@ -33,9 +33,9 @@ class DatcSpecs extends Specification {
       , "6.F.24" // paradox, difficult
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 99
+    val sep = 5
     // 75
-    val end = 104
+    val end = 99
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {

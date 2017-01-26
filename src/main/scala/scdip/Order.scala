@@ -7,10 +7,10 @@ object Order {
     override def toString: String = s"$power: $unitType $src H"
   }
 
-  case class MoveOrder(power: Power, unitType: UnitType, src: Location, dst: Location) extends Order {
+  case class MoveOrder(power: Power, unitType: UnitType, src: Location, dst: Location, explictConvoy: Boolean = false) extends Order {
 
 
-    override def toString: String = s"$power: $unitType $src - $dst"
+    override def toString: String = s"$power: $unitType $src - $dst${if (explictConvoy) " via Convoy" else ""}"
 
     def ~~(moveOrder: MoveOrder): Boolean = src ~~ moveOrder.src && dst ~~ moveOrder.dst
 
@@ -22,8 +22,7 @@ object Order {
         }.map(c => c.src.province).toSet)
     }
 
-
-    def requireConvoy(worldMap: WorldMap): Boolean = !(worldMap.isNeighbour(src, dst) || src ~~ dst)
+    def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(src, dst)
   }
 
   trait SupportOrder extends NonMoveOrder {
@@ -94,7 +93,7 @@ sealed trait OrderBase {
 
   def src: Location
 
-  def success = SuccessResult( this)
+  def success = SuccessResult(this)
 
   def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
 

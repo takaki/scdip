@@ -17,9 +17,14 @@ object OrderState {
     def step1moves(orderState: OrderState): OrderState = {
       orderState.moves.foldLeft(orderState) {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
-        case (os, m) if !m.requireConvoy(orderState.worldMap) => os
-        case (os, m) if m.unitType == Army => if (m.canConvoy(orderState.worldMap, os.orders)) os else os.setMark(m, NoConvoy("no convoy path"))
-        case (os, m) if m.unitType == Fleet => os.setMark(m, VoidMark("fleet can't jump"))
+        case (os, m) if m.unitType == Army && m.explictConvoy => os.addConvoyMove(m)
+        case (os, m) if m.unitType == Army && m.isNeighbour(os.worldMap) => os
+        case (os, m) if m.unitType == Army && !m.isNeighbour(os.worldMap) => if (m.canConvoy(orderState.worldMap, os.orders)) {
+          os.addConvoyMove(m)
+        } else {
+          os.setMark(m, NoConvoy("no convoy path"))
+        }
+        case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
       }
     }
@@ -75,7 +80,7 @@ object OrderState {
 
   //  Step 3. Calculate Initial Combat Strengths
   private def step3(orderState: OrderState): OrderState = {
-    orderState.moves.filterNot(_.requireConvoy(orderState.worldMap)).foldLeft(orderState) {
+    orderState.moves.filterNot(orderState.isConvoyTarget).foldLeft(orderState) {
       case (os, m) => cutSupport(os, m, "step3")
     }.copy(_combatListRecord = orderState.orders.foldLeft(orderState._combatListRecord) {
       case (cl, m: MoveOrder) if orderState.notMarked(m) => cl.add(m.dst.province, m)
@@ -91,8 +96,8 @@ object OrderState {
 
     orderState.supports.foldLeft(orderState) {
       case (os, s) if moveOrder.dst ~~ s.src => if (cond1(os, s) && s.power != moveOrder.power &&
-        (!moveOrder.requireConvoy(orderState.worldMap) ||
-          moveOrder.requireConvoy(orderState.worldMap) && os.supportTarget(s).fold(true) {
+        (!os.isConvoyTarget(moveOrder) ||
+          os.isConvoyTarget(moveOrder) && os.supportTarget(s).fold(true) {
             case (m: MoveOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(c => c.src ~~ m.dst)) // can't cut support when disrupt convoy route
             case (c: ConvoyOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(cv => cv == c))
             case _ => true
@@ -182,8 +187,8 @@ object OrderState {
   // Step 6. Mark Bounces Caused by Inability to Swap Places
   private def step6(orderState: OrderState): OrderState = {
     (for {
-      m <- orderState.moves.filter(m => !m.requireConvoy(orderState.worldMap) && orderState.notMarked(m))
-      swapper <- orderState.moves if orderState.notMarked(swapper) && swapper.dst ~~ m.src && swapper.src ~~ m.dst && !swapper.requireConvoy(orderState.worldMap)
+      m <- orderState.moves.filter(m => !orderState.isConvoyTarget(m) && orderState.notMarked(m))
+      swapper <- orderState.moves if orderState.notMarked(swapper) && swapper.dst ~~ m.src && swapper.src ~~ m.dst && !orderState.isConvoyTarget(swapper)
     } yield (m, swapper)).foldLeft(orderState) {
       case (os, (m, sw)) => if (m.power == sw.power || os.supportCountNH(m) <= os.supportCount(sw)) {
         step6(bounce(os, m, s"step6 by $sw"))
@@ -297,7 +302,7 @@ object OrderState {
       case _ => false
     }.map(o => (m, o)))
     val os2 = dislodgedPairs.foldLeft(orderState) {
-      case (os, (m, o: MoveOrder)) if !m.requireConvoy(os.worldMap) && !o.requireConvoy(os.worldMap) && m.src ~~ o.dst =>
+      case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
         os.delCombatList(o).addDislodged(o)
       case (os, _) => os
     }
@@ -388,23 +393,27 @@ object OrderState {
 
   }
 
-  case class ConvoyingArmies(_convoyingArmies: Map[ConvoyOrder, MoveOrder] = Map.empty) {
-    def toSeq: Seq[(MoveOrder, Set[ConvoyOrder])] = _convoyingArmies.toSeq.groupBy { case (c, m) => m }.map { case (move, seq) => (move, seq.map { case (c, m) => c }.toSet) }.toSeq
+  case class ConvoyingArmies(_convoyingArmies: Map[MoveOrder, Set[ConvoyOrder]] = Map.empty) {
+    def toSeq: Seq[(MoveOrder, Set[ConvoyOrder])] = _convoyingArmies.toSeq
 
-    def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {
-      copy(_convoyingArmies + (convoyOrder -> moveOrder))
+
+    def addConvoyMove(moveOrder: MoveOrder): ConvoyingArmies = {
+      copy(_convoyingArmies.updated(moveOrder, Set.empty))
     }
 
-    def convoyTarget(convoyOrder: ConvoyOrder): Option[MoveOrder] = _convoyingArmies.get(convoyOrder)
+    def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {
+      copy(_convoyingArmies.updated(moveOrder, _convoyingArmies.getOrElse(moveOrder, Set.empty) + convoyOrder))
+    }
 
-    def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.keys.toSet
+    def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.values.flatten.toSet
 
-    def convoyAllTargets: Set[MoveOrder] = _convoyingArmies.values.toSet
+    def convoyAllTargets: Set[MoveOrder] = _convoyingArmies.keys.toSet
 
-    def convoyFleets(moveOrder: MoveOrder): Seq[ConvoyOrder] = _convoyingArmies.collect { case (c, m) if m == moveOrder => c }.toSeq
+    def convoyFleets(moveOrder: MoveOrder): Seq[ConvoyOrder] = _convoyingArmies.getOrElse(moveOrder, Set.empty).toSeq
 
-    def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = _convoyingArmies.contains(convoyOrder)
+    def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = convoyAllFleets.contains(convoyOrder)
 
+    def isConvoyTarget(moveOrder: MoveOrder): Boolean = _convoyingArmies.contains(moveOrder)
   }
 
   case class ConvoySucceeded(_convoySucceeded: Set[MoveOrder] = Set.empty) {
@@ -510,12 +519,15 @@ case class OrderState(orders: Seq[Order],
   }
 
   // no help list
+
   // convoyingArmies
+  def addConvoyMove(moveOrder: MoveOrder): OrderState = {
+    copy(_convoyingArmies = _convoyingArmies.addConvoyMove(moveOrder))
+  }
+
   def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): OrderState = {
     copy(_convoyingArmies = _convoyingArmies.addConvoy(convoyOrder, moveOrder))
   }
-
-  def convoyTarget(convoyOrder: ConvoyOrder): Option[MoveOrder] = _convoyingArmies.convoyTarget(convoyOrder)
 
   def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.convoyAllFleets
 
@@ -527,6 +539,8 @@ case class OrderState(orders: Seq[Order],
 
   def isConvoyFleet(convoyOrder: ConvoyOrder): Boolean = _convoyingArmies.isConvoyFleet(convoyOrder)
 
+  def isConvoyTarget(moveOrder: MoveOrder): Boolean = _convoyingArmies.isConvoyTarget(moveOrder)
+
   // convoy success
 
   def addConvoySucceeded(moveOrder: MoveOrder): OrderState = copy(_convoySucceeded = _convoySucceeded.addConvoySucceeded(moveOrder))
@@ -537,7 +551,7 @@ case class OrderState(orders: Seq[Order],
 
   def delCombatList(o: MoveOrder): OrderState = copy(_combatListRecord = _combatListRecord.del(o))
 
-  def delCombatList(province: Province, order: Order) = copy(_combatListRecord = _combatListRecord.del(province, order))
+  def delCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.del(province, order))
 
   // dislodged list
   def addDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.add(order))
