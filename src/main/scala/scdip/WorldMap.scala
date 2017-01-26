@@ -132,7 +132,7 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   private def convoyGraph(fleetProvinces: Set[Province]) = {
     val seaOnly = fleetProvinces & seaProvinces
-    Graph.from(edges = fleetEdges.filter(e => seaOnly.contains(e.from.province) || seaOnly.contains(e.to.province)))
+    Graph.from(edges = fleetEdges.filter(e => seaOnly.contains(e.from.province) ))
   }
 
   private val locationMap: Map[String, Location] = {
@@ -183,8 +183,6 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
     } else {
       false
     }
-
-
   }
 
 }

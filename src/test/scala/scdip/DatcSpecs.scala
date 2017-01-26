@@ -25,10 +25,11 @@ class DatcSpecs extends Specification {
       , "6.D.8" // destroyed
       , "6.D.18" // destroyed
       , "6.D.34" // destroyed
+      , "6.E.11" // swap next province, explicit convoy
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 75
-    val end = 285 // 85
+    val sep = 86 // 75
+    val end = 196
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {
