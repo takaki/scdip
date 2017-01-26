@@ -132,7 +132,7 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   private def convoyGraph(fleetProvinces: Set[Province]) = {
     val seaOnly = fleetProvinces & seaProvinces
-    Graph.from(edges = fleetEdges.filter(e => seaOnly.contains(e.from.province) ))
+    Graph.from(edges = fleetEdges.filter(e => seaOnly.contains(e.from.province)))
   }
 
   private val locationMap: Map[String, Location] = {
@@ -185,6 +185,9 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
     }
   }
 
+  def neighbours(origin: Location, ngProvinces: Set[Province]= Set.empty): Set[Location] = {
+    diEdges.filter(e => e.from == origin && !ngProvinces.contains(e.to.province)).map(e => e.to).toSet
+  }
 }
 
 object WorldMap {

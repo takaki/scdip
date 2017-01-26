@@ -42,11 +42,19 @@ object OrderState {
 
     def checkMoves(orderState: OrderState): OrderState = {
       orderState.convoyGroups.foldLeft(orderState) {
-        case (os, (m, cs)) => if (m.canConvoy(os.worldMap, cs.toSeq)) {
-          os
-        } else {
-          os.setMark(m, NoConvoy("no convoy path"))
-        }
+        case (os, (m, cs)) if !os.worldMap.canConvoy(m.src.province, m.dst.province) => os.setMark(m, VoidMark("no path")).delConvoy(m)
+        case (os, (m, cs)) =>
+          if (os.worldMap.canConvoy(m.src.province, m.dst.province, orderState.orders.filter {
+            _.unitType == Fleet
+          }.map(_.src.province).toSet)) {
+            if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
+              os
+            } else {
+              os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
+            }
+          } else {
+            os.setMark(m, VoidMark("not fleets exist")).delConvoy(m)
+          }
       }
     }
 
@@ -72,7 +80,8 @@ object OrderState {
         case (os, s: SupportHoldOrder) =>
           s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
             case (nm: NonMoveOrder) => os.addSupport(nm, s)
-            case (m: MoveOrder) if !os.notMarked(m) => os.addSupport(m, s)
+            //            case (m: MoveOrder) if !os.notMarked(m) => os.addSupport(m, s)
+            case (m: MoveOrder) if os.getMark(m).fold(false)(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
             case _ => os
           }
         case (os, s: SupportMoveOrder) =>
@@ -164,21 +173,24 @@ object OrderState {
   // Step 5. Mark Convoy Disruptions And Support Cuts Made by Successful Convoys
   private def step5(orderState: OrderState): OrderState = {
     def impl0(orderState: OrderState) = {
-      orderState.convoyAllTargets.foldLeft(orderState) { case (os, m) =>
-        if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
-          impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
-        } else {
-          if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
-            (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
+      orderState.convoyAllTargets.foldLeft(orderState) {
+        case (os, m) =>
+          if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
+            impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
           } else {
-            os
+            if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
+              (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
+            } else {
+              os
+            }
           }
-        }
       }
     }
 
     def impl1(orderState: OrderState, m: MoveOrder): OrderState = {
-      orderState.convoyFleets(m).foldLeft(orderState) { case (os, c) => os.setMark(c, NoConvoy("step5-target-endangered")) }
+      orderState.convoyFleets(m).foldLeft(orderState) {
+        case (os, c) => os.setMark(c, NoConvoy("step5-target-endangered"))
+      }
     }
 
     def impl2(orderState: OrderState, m: MoveOrder): OrderState = {
@@ -233,7 +245,9 @@ object OrderState {
   // Step 7. Mark Bounces Suffered by Understrength Attackers
   private def step7(orderState: OrderState): OrderState = {
     val bounced = orderState._combatListRecord.provinces.flatMap(province => {
-      orderState._combatListRecord.orders(province).collect { case (m: MoveOrder) if orderState.notMarked(m) => m }.filter(m =>
+      orderState._combatListRecord.orders(province).collect {
+        case (m: MoveOrder) if orderState.notMarked(m) => m
+      }.filter(m =>
         orderState._combatListRecord.orders(province).filter(o => o != m).exists {
           case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src.province == province => 0 >= orderState.supportCount(m)
           case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
@@ -243,7 +257,9 @@ object OrderState {
     if (bounced.isEmpty) {
       orderState
     } else {
-      step6to7(bounced.foldLeft(orderState) { case (os, m) => bounce(os, m, "step7") })
+      step6to7(bounced.foldLeft(orderState) {
+        case (os, m) => bounce(os, m, "step7")
+      })
     }
   }
 
@@ -289,7 +305,11 @@ object OrderState {
       if (orders.isEmpty) {
         orderState
       } else {
-        val (_, maximum) = orders.map(o => (o, orderState.supportCount(o))).groupBy { case (_, sc) => sc }.maxBy { case (sc, _) => sc }
+        val (_, maximum) = orders.map(o => (o, orderState.supportCount(o))).groupBy {
+          case (_, sc) => sc
+        }.maxBy {
+          case (sc, _) => sc
+        }
         if (maximum.size == 1) {
           val (max, _) = maximum.head
           if (orderState.getMark(max).fold(false)(_.isInstanceOf[Bounce])) {
@@ -310,13 +330,13 @@ object OrderState {
 
     val dislodgedPairs = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
       case (o: NonMoveOrder) if m.dst ~~ o.src => true
-      case (o) if !orderState.notMarked(o) && m.dst ~~ o.src => true
+      case (o: MoveOrder) if !orderState.notMarked(o) && m.dst ~~ o.src => true
       case _ => false
     }.map(o => (m, o)))
     val os2 = dislodgedPairs.foldLeft(orderState) {
       case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
-        os.delCombatList(o).addDislodged(o)
-      case (os, _) => os
+        os.delCombatList(o).addDislodged(o, m)
+      case (os, (m, o)) => os.addDislodged(o, m)
     }
     dislodgedPairs.foldLeft(os2) {
       case (os, (m, _)) => unbounce(os, m.src.province)
@@ -408,14 +428,16 @@ object OrderState {
   case class ConvoyingArmies(_convoyingArmies: Map[MoveOrder, Set[ConvoyOrder]] = Map.empty) {
     def toSeq: Seq[(MoveOrder, Set[ConvoyOrder])] = _convoyingArmies.toSeq
 
-
     def addConvoyMove(moveOrder: MoveOrder): ConvoyingArmies = {
       copy(_convoyingArmies.updated(moveOrder, _convoyingArmies.getOrElse(moveOrder, Set.empty)))
     }
 
+
     def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {
       copy(_convoyingArmies.updated(moveOrder, _convoyingArmies.getOrElse(moveOrder, Set.empty) + convoyOrder))
     }
+
+    def delConvoy(m: MoveOrder): ConvoyingArmies = copy(_convoyingArmies - m)
 
     def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.values.flatten.toSet
 
@@ -434,8 +456,10 @@ object OrderState {
     def isConvoySuccess(m: MoveOrder): Boolean = _convoySucceeded.contains(m)
   }
 
-  case class DislodgedList(orders: Set[Order] = Set.empty) {
-    def add(order: Order): DislodgedList = copy(orders = orders + order)
+  case class DislodgedList(orders: Map[Order, MoveOrder] = Map.empty) {
+    def provinces: Seq[Location] = orders.keys.map(_.src).toSeq
+
+    def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(orders = orders + (order -> moveOrder))
 
     def del(order: Order): DislodgedList = copy(orders = orders - order)
 
@@ -541,6 +565,10 @@ case class OrderState(orders: Seq[Order],
     copy(_convoyingArmies = _convoyingArmies.addConvoy(convoyOrder, moveOrder))
   }
 
+  def delConvoy(m: MoveOrder): OrderState = {
+    copy(_convoyingArmies = _convoyingArmies.delConvoy(m))
+  }
+
   def convoyAllFleets: Set[ConvoyOrder] = _convoyingArmies.convoyAllFleets
 
   def convoyAllTargets: Set[MoveOrder] = _convoyingArmies.convoyAllTargets
@@ -566,7 +594,7 @@ case class OrderState(orders: Seq[Order],
   def delCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.del(province, order))
 
   // dislodged list
-  def addDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.add(order))
+  def addDislodged(order: Order, moveOrder: MoveOrder): OrderState = copy(_dislodgedList = _dislodgedList.add(order, moveOrder))
 
   def delDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.del(order))
 
