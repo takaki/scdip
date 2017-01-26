@@ -93,7 +93,8 @@ object OrderState {
       case (os, s) if moveOrder.dst ~~ s.src => if (cond1(os, s) && s.power != moveOrder.power &&
         (!moveOrder.requireConvoy(orderState.worldMap) ||
           moveOrder.requireConvoy(orderState.worldMap) && os.supportTarget(s).fold(true) {
-            case (m: MoveOrder) if os.convoyFleets(moveOrder).map(c => c.src).contains(m.dst) => false
+            case (m: MoveOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(c => c.src ~~ m.dst)) // can't cut support when disrupt convoy route
+            case (c: ConvoyOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(cv => cv == c))
             case _ => true
           })) s match {
         case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).delSupport(sh))

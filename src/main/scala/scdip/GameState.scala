@@ -56,6 +56,7 @@ case class MovementState(turn: Turn,
   }
 }
 
+// TODO: dislodged and disrupted
 case class RetreatState(turn: Turn, supplyCenterInfo: SupplyCenterInfo, unitLocation: UnitLocation, dislodgeUnits: Seq[UnitState]) extends GameState {
   override val phaseType = PhaseType.Retreat
 
