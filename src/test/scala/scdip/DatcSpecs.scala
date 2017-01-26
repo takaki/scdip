@@ -21,19 +21,18 @@ class DatcSpecs extends Specification {
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
       "6.B.10" // wrong coast
       , "6.B.11" // wrong coast
-      , "6.B.14" //adjustment
-      , "6.D.8" // destroyed
+      , "6.B.14" // adjustment
+      , "6.D.8"  // destroyed
       , "6.D.18" // destroyed
       , "6.D.34" // destroyed
-      , "6.E.11" // swap next province, explicit convoy
       , "6.F.17 (Pandin's extended paradox)" // forgetted dislodged check in testcase
       , "6.F.18" // paradox, difficult
-      , "6.F.21" // destryed
+      , "6.F.21" // destroyed
       , "6.F.23" // paradox, difficult
       , "6.F.24" // paradox, difficult
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 5
+    val sep = 63
     // 75
     val end = 99
     "2nd" >> {

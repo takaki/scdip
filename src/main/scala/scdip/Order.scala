@@ -14,12 +14,9 @@ object Order {
 
     def ~~(moveOrder: MoveOrder): Boolean = src ~~ moveOrder.src && dst ~~ moveOrder.dst
 
-    def canConvoy(worldMap: WorldMap, orders: Seq[Order]): Boolean = {
+    def canConvoy(worldMap: WorldMap, convoys: Seq[ConvoyOrder]): Boolean = {
       worldMap.canConvoy(src.province, dst.province,
-        convoys = orders.filter {
-          case (c: ConvoyOrder) => c.from ~~ src && c.to ~~ dst
-          case _ => false
-        }.map(c => c.src.province).toSet)
+        convoys = convoys.map(_.src.province).toSet)
     }
 
     def isNeighbour(worldMap: WorldMap): Boolean = worldMap.isNeighbour(src, dst)

@@ -18,11 +18,14 @@ object OrderState {
       orderState.moves.foldLeft(orderState) {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
         case (os, m) if m.unitType == Army && m.explictConvoy => os.addConvoyMove(m)
-        case (os, m) if m.unitType == Army && m.isNeighbour(os.worldMap) => os
-        case (os, m) if m.unitType == Army && !m.isNeighbour(os.worldMap) => if (m.canConvoy(orderState.worldMap, os.orders)) {
-          os.addConvoyMove(m)
+        case (os, m) if m.unitType == Army => if (m.isNeighbour(os.worldMap)) {
+          orderState.convoys.filter(c => m.power == c.power && m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os) {
+            case (os2, (c2)) => os2.addConvoy(c2, m)
+          }
         } else {
-          os.setMark(m, NoConvoy("no convoy path"))
+          orderState.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os.addConvoyMove(m)) {
+            case (os2, (c2)) => os2.addConvoy(c2, m)
+          }
         }
         case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
@@ -30,16 +33,25 @@ object OrderState {
     }
 
     def step1convoys(orderState: OrderState): OrderState = {
-      orderState.convoys.foldLeft(orderState) {
+      (orderState.convoys.toSet -- orderState.convoyAllFleets).foldLeft(orderState) {
         case (os, c) if c.unitType == Army => os.setMark(c, VoidMark("army can't convoy"))
-        case (os, c) if c.unitType == Fleet => c.findConvoyTarget(os.moves).fold(os.setMark(c, VoidMark("no convoy target"))) { m =>
-          if (os.notMarked(m)) os.addConvoy(c, m) else os.setMark(c, VoidMark("no convoy target"))
-        }
+        case (os, c) if c.unitType == Fleet => os.setMark(c, VoidMark("no convoy target"))
         case (os, _) => os
       }
     }
 
-    (step1moves _).andThen(step1convoys)(orderState)
+    def checkMoves(orderState: OrderState): OrderState = {
+      orderState.convoyGroups.foldLeft(orderState) {
+        case (os, (m, cs)) => if (m.canConvoy(os.worldMap, cs.toSeq)) {
+          os
+        } else {
+          os.setMark(m, NoConvoy("no convoy path"))
+        }
+      }
+    }
+
+    (step1moves _).andThen(step1convoys).andThen(checkMoves)(orderState)
+    //    (checkFleets _).andThen(checkMoves).andThen(build)(orderState)
   }
 
   // Step 2. Mark All Invalid Move and Support Orders
@@ -398,7 +410,7 @@ object OrderState {
 
 
     def addConvoyMove(moveOrder: MoveOrder): ConvoyingArmies = {
-      copy(_convoyingArmies.updated(moveOrder, Set.empty))
+      copy(_convoyingArmies.updated(moveOrder, _convoyingArmies.getOrElse(moveOrder, Set.empty)))
     }
 
     def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {

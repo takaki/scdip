@@ -31,7 +31,7 @@ class OrderResolutionSpecs extends Specification {
         |England: A Yorkshire-Yorkshire
         |England: A liverpool supports A Yorkshire-Yorkshire""".stripMargin)
     val os0 = os.resolve
-    os0.results(2).mark must beSome(VoidMark("same place"))
+    os0.results(2).mark must beSome(VoidMark("same province"))
   }
 
   "CASE 6.A.5 (Move to own sector with convoy)" >> {
@@ -44,11 +44,11 @@ class OrderResolutionSpecs extends Specification {
         |""".stripMargin)
     val os0 = os.resolve
     os0.results(0).mark must beSome
-    os0.results(1).mark must beSome(VoidMark("same place"))
-    os0.results(2).mark must beNone
+    os0.results(1).mark must beSome(VoidMark("same province"))
+    os0.results(2).mark must beSome
     os0.results(3).mark must beNone
     os0.results(4).mark must beNone
-    os0.results.collect { case (s: SuccessResult) => s } must have size 3
+    os0.results.collect { case (s: SuccessResult) => s } must have size 2
   }
 
   "CASE 6.A.10.old (Nov-24-2001 DATC)" >> {
