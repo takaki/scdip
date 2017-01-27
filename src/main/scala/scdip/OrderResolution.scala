@@ -29,7 +29,7 @@ object OrderState {
               os
             }
           } else {
-            os.addConvoys(m,convoys)
+            os.addConvoys(m, convoys)
           }
         case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
@@ -53,7 +53,7 @@ object OrderState {
           if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
             os
           } else {
-            if(m.explictConvoy && m.isNeighbour(os.worldMap)) {
+            if (m.explictConvoy && m.isNeighbour(os.worldMap)) {
               os.delConvoy(m)
             } else {
               os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
@@ -107,13 +107,14 @@ object OrderState {
 
   //  Step 3. Calculate Initial Combat Strengths
   private def step3(orderState: OrderState): OrderState = {
-    orderState.moves.filterNot(orderState.isConvoyTarget).foldLeft(orderState) {
+    val os2 = orderState.moves.filterNot(orderState.isConvoyTarget).foldLeft(orderState) {
       case (os, m) => cutSupport(os, m, "step3")
-    }.copy(_combatListRecord = orderState.orders.foldLeft(orderState._combatListRecord) {
-      case (cl, m: MoveOrder) if orderState.notMarked(m) => cl.add(m.dst.province, m)
-      case (cl, m: MoveOrder) => cl.add(m.src.province, m)
-      case (cl, o) => cl.add(o.src.province, o)
-    })
+    }
+    os2.orders.foldLeft(os2) {
+      case (os, m: MoveOrder) if orderState.notMarked(m) => os.addCombatList(m.dst.province, m)
+      case (os, m: MoveOrder) => os.addCombatList(m.src.province, m)
+      case (os, o) => os.addCombatList(o.src.province, o)
+    }
   }
 
   private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity, inStep9: Boolean = false): OrderState = {
@@ -603,6 +604,11 @@ case class OrderState(orders: Seq[Order],
   def delCombatList(o: MoveOrder): OrderState = copy(_combatListRecord = _combatListRecord.del(o))
 
   def delCombatList(province: Province, order: Order): OrderState = copy(_combatListRecord = _combatListRecord.del(province, order))
+
+  // combat list
+  def combatListAdd(province: Province, order: Order): OrderState = {
+    copy(_combatListRecord = _combatListRecord.add(order.src.province, order))
+  }
 
   // dislodged list
   def addDislodged(order: Order, moveOrder: MoveOrder): OrderState = copy(_dislodgedList = _dislodgedList.add(order, moveOrder))
