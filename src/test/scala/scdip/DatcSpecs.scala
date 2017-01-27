@@ -43,7 +43,7 @@ class DatcSpecs extends Specification {
       , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 110
+    val sep = 123
     // 75
     val end = 123
     "2nd" >> {

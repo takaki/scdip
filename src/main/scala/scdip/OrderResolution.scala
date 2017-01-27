@@ -17,24 +17,19 @@ object OrderState {
     def step1moves(orderState: OrderState): OrderState = {
       orderState.moves.foldLeft(orderState) {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
-        // TODO: add multi add method
         case (os, m) if m.unitType == Army && m.explictConvoy =>
-          os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os.addConvoyMove(m)) {
-            case (os2, (c2)) => os2.addConvoy(c2, m)
-          }
+          os.addConvoys(m, os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to))
         case (os, m) if m.unitType == Army =>
           val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
           if (m.isNeighbour(os.worldMap)) {
             if (convoys.exists(c => c.power == m.power)) {
               //              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
-              convoys.foldLeft(os) { case (os2, (c2)) => os2.addConvoy(c2, m) }
+              os.addConvoys(m, convoys)
             } else {
               os
             }
           } else {
-            convoys.foldLeft(os.addConvoyMove(m)) {
-              case (os2, (c2)) => os2.addConvoy(c2, m)
-            }
+            os.addConvoys(m,convoys)
           }
         case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
@@ -324,11 +319,11 @@ object OrderState {
         if (maximum.size == 1) {
           val (max, _) = maximum.head
           if (orderState.getMark(max).fold(false)(_.isInstanceOf[Bounce])) {
-            val os2 = orderState.delMark(max)
-            if (os2.isDislodged(max)) {
-              os2.delDislodged(max)
+            val os = orderState.delMark(max)
+            if (os.isDislodged(max)) {
+              os.delDislodged(max)
             } else {
-              unbounce(os2.delCombatList(province, max), province)
+              unbounce(os.delCombatList(province, max), province)
             }
           } else {
             orderState
@@ -352,7 +347,6 @@ object OrderState {
     dislodgedPairs.foldLeft(os2) {
       case (os, (m, _)) => unbounce(os, m.src.province)
     }
-    // retreat list
   }
 
   case class MarkRecord(_orderMark: Map[Order, OrderMark] = Map.empty) {
@@ -444,7 +438,7 @@ object OrderState {
     }
 
 
-    def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): ConvoyingArmies = {
+    def addConvoy(moveOrder: MoveOrder, convoyOrder: ConvoyOrder): ConvoyingArmies = {
       copy(_convoyingArmies.updated(moveOrder, _convoyingArmies.getOrElse(moveOrder, Set.empty) + convoyOrder))
     }
 
@@ -573,7 +567,13 @@ case class OrderState(orders: Seq[Order],
   }
 
   def addConvoy(convoyOrder: ConvoyOrder, moveOrder: MoveOrder): OrderState = {
-    copy(_convoyingArmies = _convoyingArmies.addConvoy(convoyOrder, moveOrder))
+    copy(_convoyingArmies = _convoyingArmies.addConvoy(moveOrder, convoyOrder))
+  }
+
+  def addConvoys(m: MoveOrder, convoys: Seq[ConvoyOrder]): OrderState = {
+    convoys.foldLeft(addConvoyMove(m)) {
+      case (os, (c)) => os.addConvoy(c, m)
+    }
   }
 
   def delConvoy(m: MoveOrder): OrderState = {
