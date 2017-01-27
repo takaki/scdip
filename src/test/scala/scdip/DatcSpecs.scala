@@ -22,7 +22,7 @@ class DatcSpecs extends Specification {
       "6.B.10" // wrong coast
       , "6.B.11" // wrong coast
       , "6.B.14" // adjustment
-      , "6.F.17 (Pandin's extended paradox)" // forgetted dislodged check in testcase
+      , "6.F.17 (Pandin's extended paradox)" // wrong test case (forgetted dislodged)
       , "6.F.18" // paradox, difficult
       , "6.F.23" // paradox, difficult
       , "6.F.24" // paradox, difficult

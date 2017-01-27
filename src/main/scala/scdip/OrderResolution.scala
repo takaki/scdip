@@ -58,7 +58,11 @@ object OrderState {
           if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
             os
           } else {
-            os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
+            if(m.explictConvoy && m.isNeighbour(os.worldMap)) {
+              os.delConvoy(m)
+            } else {
+              os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
+            }
           }
         } else {
           os.setMark(m, VoidMark("not fleets exist")).delConvoy(m)
@@ -67,7 +71,6 @@ object OrderState {
     }
 
     (step1moves _).andThen(step1convoys).andThen(checkMoves)(orderState)
-    //    (checkFleets _).andThen(checkMoves).andThen(build)(orderState)
   }
 
   // Step 2. Mark All Invalid Move and Support Orders
