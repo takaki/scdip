@@ -17,14 +17,16 @@ object OrderState {
     def step1moves(orderState: OrderState): OrderState = {
       orderState.moves.foldLeft(orderState) {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
+        // TODO: add multi add method
         case (os, m) if m.unitType == Army && m.explictConvoy =>
-          orderState.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os.addConvoyMove(m)) {
+          os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os.addConvoyMove(m)) {
             case (os2, (c2)) => os2.addConvoy(c2, m)
           }
         case (os, m) if m.unitType == Army =>
-          val convoys = orderState.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
+          val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
           if (m.isNeighbour(os.worldMap)) {
-            if (convoys.exists(_.power == m.power)) {
+            if (convoys.exists(c => c.power == m.power)) {
+//              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
               convoys.foldLeft(os) { case (os2, (c2)) => os2.addConvoy(c2, m) }
             } else {
               os

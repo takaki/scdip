@@ -26,11 +26,12 @@ class DatcSpecs extends Specification {
       , "6.F.18" // paradox, difficult
       , "6.F.23" // paradox, difficult
       , "6.F.24" // paradox, difficult
+      , "6.G.7" // TODO: neighboru convoy, need special path check POSTPONE
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 108
+    val sep = 114
     // 75
-    val end = 119
+    val end = 123
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {
