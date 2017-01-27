@@ -26,7 +26,7 @@ object OrderState {
           val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
           if (m.isNeighbour(os.worldMap)) {
             if (convoys.exists(c => c.power == m.power)) {
-//              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
+              //              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
               convoys.foldLeft(os) { case (os2, (c2)) => os2.addConvoy(c2, m) }
             } else {
               os
@@ -52,18 +52,17 @@ object OrderState {
     def checkMoves(orderState: OrderState): OrderState = {
       orderState.convoyGroups.foldLeft(orderState) {
         case (os, (m, cs)) if !os.worldMap.canConvoy(m.src.province, m.dst.province) => os.setMark(m, VoidMark("no path")).delConvoy(m)
-        case (os, (m, cs)) =>
-          if (os.worldMap.canConvoy(m.src.province, m.dst.province, orderState.orders.filter {
-            _.unitType == Fleet
-          }.map(_.src.province).toSet)) {
-            if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
-              os
-            } else {
-              os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
-            }
+        case (os, (m, cs)) => if (os.worldMap.canConvoy(m.src.province, m.dst.province, orderState.orders.collect {
+          case (o) if o.unitType == Fleet => o.src.province
+        }.toSet)) {
+          if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
+            os
           } else {
-            os.setMark(m, VoidMark("not fleets exist")).delConvoy(m)
+            os.setMark(m, NoConvoy("no convoy path")).delConvoy(m)
           }
+        } else {
+          os.setMark(m, VoidMark("not fleets exist")).delConvoy(m)
+        }
       }
     }
 

@@ -64,11 +64,14 @@ class WorldMapSpecs extends Specification {
       val lvn = worldMap.province("lvn")
       val lvp = worldMap.province("lvp")
       val iri = worldMap.province("iri")
+      val nwy = worldMap.province("nwy")
+      val swe = worldMap.province("swe")
       worldMap.canConvoy(lon, nor) must beTrue
       worldMap.canConvoy(lon, syr) must beTrue
       worldMap.canConvoy(mos, nor) must beFalse
-      worldMap.canConvoy(lon, lvn) must beTrue
+      worldMap.canConvoy(lon, lvn) must beFalse
       worldMap.canConvoy(lvp, iri) must beFalse
+      worldMap.canConvoy(nwy, swe) must beTrue
     }
     "connected" >> {
       val gasMv = worldMap.location("gas-xc")

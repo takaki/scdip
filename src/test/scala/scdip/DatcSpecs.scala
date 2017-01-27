@@ -26,10 +26,10 @@ class DatcSpecs extends Specification {
       , "6.F.18" // paradox, difficult
       , "6.F.23" // paradox, difficult
       , "6.F.24" // paradox, difficult
-      , "6.G.7" // TODO: neighboru convoy, need special path check POSTPONE
+      , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 114
+    val sep = 110
     // 75
     val end = 123
     "2nd" >> {
