@@ -14,26 +14,24 @@ object OrderState {
 
   // Step 1. Mark All Invalid Convoy Orders
   private def step1(orderState: OrderState): OrderState = {
-    def step1moves(orderState: OrderState): OrderState = {
-      orderState.foldMoves {
-        case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
-        case (os, m) if m.unitType == Army && m.explictConvoy =>
-          os.addConvoys(m, os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to))
-        case (os, m) if m.unitType == Army =>
-          val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
-          if (m.isNeighbour(os.worldMap)) {
-            if (convoys.exists(c => c.power == m.power)) {
-              //              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
-              os.addConvoys(m, convoys)
-            } else {
-              os
-            }
-          } else {
+    def step1moves(orderState: OrderState): OrderState = orderState.foldMoves {
+      case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
+      case (os, m) if m.unitType == Army && m.explictConvoy =>
+        os.addConvoys(m, os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to))
+      case (os, m) if m.unitType == Army =>
+        val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
+        if (m.isNeighbour(os.worldMap)) {
+          if (convoys.exists(c => c.power == m.power)) {
+            //              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
             os.addConvoys(m, convoys)
+          } else {
+            os
           }
-        case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
-        case (os, _) => os
-      }
+        } else {
+          os.addConvoys(m, convoys)
+        }
+      case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
+      case (os, _) => os
     }
 
     def step1convoys(orderState: OrderState): OrderState = {
@@ -65,7 +63,7 @@ object OrderState {
       }
     }
 
-    (step1moves _).andThen(step1convoys).andThen(checkMoves)(orderState)
+    checkMoves(step1convoys(step1moves(orderState)))
   }
 
   // Step 2. Mark All Invalid Move and Support Orders
@@ -86,7 +84,6 @@ object OrderState {
         case (os, s: SupportHoldOrder) =>
           s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
             case (nm: NonMoveOrder) => os.addSupport(nm, s)
-            //            case (m: MoveOrder) if !os.notMarked(m) => os.addSupport(m, s)
             case (m: MoveOrder) if os.getMark(m).fold(false)(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
             case _ => os
           }
@@ -102,7 +99,7 @@ object OrderState {
       }
     }
 
-    (check0 _).andThen(check1)(orderState)
+    check1(check0(orderState))
   }
 
   //  Step 3. Calculate Initial Combat Strengths
@@ -146,8 +143,11 @@ object OrderState {
 
     def impl(orderState: OrderState): OrderState = {
       orderState.convoyAllTargets.foldLeft(orderState) {
-        case (os, m) if os.notMarked(m) => impl2(cutSupport(os, m, "step4-impl"), m)
-        case (os, m) => os.setMark(m, ConvoyUnderAttack())
+        case (os, m) => if (os.notMarked(m)) {
+          impl2(cutSupport(os, m, "step4-impl"), m)
+        } else {
+          os.setMark(m, ConvoyUnderAttack())
+        }
       }
 
     }
@@ -160,13 +160,13 @@ object OrderState {
       }
     }
 
-    (checkDisruption _).andThen(impl)(orderState)
+    impl(checkDisruption(orderState))
   }
 
   private def checkDisruption(orderState: OrderState): OrderState = {
     orderState.convoyGroups.foldLeft(orderState) {
       case (os, (m, cs)) =>
-        val safe = cs.filter(c => os.uniqueStrongOrder(c.src.province).fold(true)(ho => ho.power == c.power))
+        val safe = cs.filter(c => os.uniqueStrongestOrder(c.src.province).fold(true)(ho => ho.power == c.power))
         if (m.canConvoy(os.worldMap, safe.toSeq)) {
           os
         } else {
@@ -184,7 +184,7 @@ object OrderState {
             impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
           } else {
             if (os.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
-              (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
+              (impl2(_: OrderState, m)).compose(cutSupport(_: OrderState, m, "step5-1"))(os.delMark(m))
             } else {
               os
             }
@@ -206,7 +206,7 @@ object OrderState {
       }
     }
 
-    (checkDisruption _).andThen(impl0)(orderState)
+    impl0(checkDisruption(orderState))
   }
 
   def step4to5(orderState: OrderState): OrderState = {
@@ -252,7 +252,7 @@ object OrderState {
         case (m: MoveOrder) if orderState.notMarked(m) => m
       }.filter(m =>
         cos.filter(o => o != m).exists {
-          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src.province == p => 0 >= orderState.supportCount(m)
+          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src ~~ p => 0 >= orderState.supportCount(m)
           case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
         }
       )
@@ -284,7 +284,7 @@ object OrderState {
       case (os, m) => os.orders.find(h => h.src ~~ m.dst).fold(os) {
         case (o: MoveOrder) if orderState.notMarked(o) => os
         case nm if nm.power == m.power => step6to8(bounce(os, m, "step8 self-attack"))
-        case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).filterNot(o => o == m).map(o => os.supportCount(o)).reduceOption(_ max _).getOrElse(0)) {
+        case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).collect { case o if o != m => os.supportCount(o) }.reduceOption(_ max _).getOrElse(0)) {
           os
         } else {
           step6to8(bounce(os, m, "step8-NH"))
@@ -541,15 +541,15 @@ case class OrderState(orders: Seq[Order],
 
   def supportTarget(s: SupportOrder): Option[Order] = _supportRecord.supportTarget(s)
 
-  def uniqueStrongOrder(province: Province): Option[Order] = {
-    val (_, mos) = orders.filter {
+  def uniqueStrongestOrder(province: Province): Option[Order] = {
+    val mos: Seq[(Order, Int)] = orders.filter {
       case (m: MoveOrder) => m.dst ~~ province
       case (o) => o.src ~~ province
     }.map(o => (o, _supportRecord.supportCount(o, _markRecord))).groupBy {
       case (_, sc) => sc
     }.maxBy {
       case (sc, _) => sc
-    }
+    }._2
     if (mos.size == 1) Option(mos.head._1) else None
   }
 
@@ -608,6 +608,7 @@ case class OrderState(orders: Seq[Order],
   }
 
   def combatListSeq: Seq[(Province, Set[Order])] = _combatListRecord.toSeq
+
   def combatOrders(province: Province): Seq[Order] = _combatListRecord.orders(province)
 
   // dislodged list
