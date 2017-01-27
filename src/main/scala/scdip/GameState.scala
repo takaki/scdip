@@ -31,7 +31,7 @@ case class MovementState(turn: Turn,
     val dislodged: Seq[Location] = orderResults.dislodgedList.provinces
     val clearedUnitLocation = dislodged.foldLeft(unitLocation) { (u, l) => u.clear(l) }
     val newUnitLocation = move(clearedUnitLocation, moves)
-    val retreatAreas = orderResults.dislodgedList.orders.toSeq.map {
+    val retreatAreas = orderResults.dislodgedList._dislodged.toSeq.map {
       case (o, m) => (o, worldMap.neighbours(o.src, orderResults.combatListRecord.provinces.toSet + m.src.province))
     }
     val ds: Seq[Location] = retreatAreas.collect {

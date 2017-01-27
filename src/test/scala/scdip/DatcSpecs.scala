@@ -22,16 +22,15 @@ class DatcSpecs extends Specification {
       "6.B.10" // wrong coast
       , "6.B.11" // wrong coast
       , "6.B.14" // adjustment
-      //      , "6.D.8"  // destroyed
       , "6.F.17 (Pandin's extended paradox)" // forgetted dislodged check in testcase
       , "6.F.18" // paradox, difficult
       , "6.F.23" // paradox, difficult
       , "6.F.24" // paradox, difficult
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 99
+    val sep = 108
     // 75
-    val end = 99
+    val end = 119
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
         Fragments.foreach(d.runTest)(t => t._1 >> {
@@ -40,7 +39,7 @@ class DatcSpecs extends Specification {
       })
     }
     "1st" >> {
-      Fragments.foreach(datcs.zipWithIndex.slice(0, sep)) { case(d,i) =>
+      Fragments.foreach(datcs.zipWithIndex.slice(0, sep)) { case (d, i) =>
         s"$i ${d.title}" >> {
           Fragments.foreach(d.runTest)(t => t._1 >> {
             t._2.apply()
@@ -69,7 +68,7 @@ case class Datc(variant: Variant,
       val iniState = variant.movementState
       val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
       val retreatState = testState.next(orders).asInstanceOf[RetreatState] // TODO: FIXME
-      Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)),
+      Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
       Seq(("NOT IMPLEMENTED", () => 1 === 2))

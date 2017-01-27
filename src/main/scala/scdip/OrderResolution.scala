@@ -17,16 +17,23 @@ object OrderState {
     def step1moves(orderState: OrderState): OrderState = {
       orderState.moves.foldLeft(orderState) {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
-        case (os, m) if m.unitType == Army && m.explictConvoy => os.addConvoyMove(m)
-        case (os, m) if m.unitType == Army => if (m.isNeighbour(os.worldMap)) {
-          orderState.convoys.filter(c => m.power == c.power && m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os) {
-            case (os2, (c2)) => os2.addConvoy(c2, m)
-          }
-        } else {
+        case (os, m) if m.unitType == Army && m.explictConvoy =>
           orderState.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to).foldLeft(os.addConvoyMove(m)) {
             case (os2, (c2)) => os2.addConvoy(c2, m)
           }
-        }
+        case (os, m) if m.unitType == Army =>
+          val convoys = orderState.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
+          if (m.isNeighbour(os.worldMap)) {
+            if (convoys.exists(_.power == m.power)) {
+              convoys.foldLeft(os) { case (os2, (c2)) => os2.addConvoy(c2, m) }
+            } else {
+              os
+            }
+          } else {
+            convoys.foldLeft(os.addConvoyMove(m)) {
+              case (os2, (c2)) => os2.addConvoy(c2, m)
+            }
+          }
         case (os, m) if m.unitType == Fleet && !m.isNeighbour(os.worldMap) => os.setMark(m, VoidMark("fleet can't jump"))
         case (os, _) => os
       }
@@ -456,14 +463,14 @@ object OrderState {
     def isConvoySuccess(m: MoveOrder): Boolean = _convoySucceeded.contains(m)
   }
 
-  case class DislodgedList(orders: Map[Order, MoveOrder] = Map.empty) {
-    def provinces: Seq[Location] = orders.keys.map(_.src).toSeq
+  case class DislodgedList(_dislodged: Map[Order, MoveOrder] = Map.empty) {
+    def provinces: Seq[Location] = _dislodged.keys.map(_.src).toSeq
 
-    def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(orders = orders + (order -> moveOrder))
+    def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(_dislodged = _dislodged + (order -> moveOrder))
 
-    def del(order: Order): DislodgedList = copy(orders = orders - order)
+    def del(order: Order): DislodgedList = copy(_dislodged = _dislodged - order)
 
-    def contains(order: Order): Boolean = orders.contains(order)
+    def contains(order: Order): Boolean = _dislodged.contains(order)
   }
 
 }
