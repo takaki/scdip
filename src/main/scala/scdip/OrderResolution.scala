@@ -15,7 +15,7 @@ object OrderState {
   // Step 1. Mark All Invalid Convoy Orders
   private def step1(orderState: OrderState): OrderState = {
     def step1moves(orderState: OrderState): OrderState = {
-      orderState.moves.foldLeft(orderState) {
+      orderState.foldMoves {
         case (os, m) if m.src ~~ m.dst => os.setMark(m, VoidMark("same province"))
         case (os, m) if m.unitType == Army && m.explictConvoy =>
           os.addConvoys(m, os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to))
@@ -107,9 +107,7 @@ object OrderState {
 
   //  Step 3. Calculate Initial Combat Strengths
   private def step3(orderState: OrderState): OrderState = {
-    val os2 = orderState.moves.filterNot(orderState.isConvoyTarget).foldLeft(orderState) {
-      case (os, m) => cutSupport(os, m, "step3")
-    }
+    val os2 = orderState.foldMoves((os, m) => cutSupport(os, m, "step3"), _.filterNot(orderState.isConvoyTarget))
     os2.orders.foldLeft(os2) {
       case (os, m: MoveOrder) if orderState.notMarked(m) => os.addCombatList(m.dst.province, m)
       case (os, m: MoveOrder) => os.addCombatList(m.src.province, m)
@@ -299,9 +297,8 @@ object OrderState {
 
   // Step 9. Mark Supports Cut By Dislodgements
   private def step9(orderState: OrderState): OrderState = {
-    orderState.moves.filter(o => orderState.notMarked(o)).foldLeft(orderState) {
-      case (os, m) => cutSupport(os, m, "step9", step6to9, inStep9 = true)
-    }
+    orderState.foldMoves((os, m) => cutSupport(os, m, "step9", step6to9, inStep9 = true),
+      _.filter(o => orderState.notMarked(o)))
   }
 
   //Step 10. Move Units That Did Not Bounce
@@ -503,6 +500,8 @@ case class OrderState(orders: Seq[Order],
   }
 
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
+
+  def foldMoves(f: (OrderState, MoveOrder) => OrderState, modifier: (Seq[MoveOrder] => Seq[MoveOrder]) = identity): OrderState = modifier(moves).foldLeft(this)(f)
 
   def holds: Seq[HoldOrder] = orders.collect { case o: HoldOrder => o }
 
