@@ -12,20 +12,20 @@ import scala.xml.XML
 @RunWith(classOf[JUnitRunner])
 class DatcSpecs extends Specification {
 
-//  "run real.txt" >> {
-//    val txt = Source.fromInputStream(getClass.getResourceAsStream("/real.txt")).mkString
-//    val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
-//    val variant = variants.variant("Standard [No Units]").get
-//    val parsers = DatcParser(variant)
-//    val datcs = parsers.parse(txt).right.get
-//    Fragments.foreach(datcs.zipWithIndex) { case (d, i) =>
-//      s"$i ${d.title}" >> {
-//        Fragments.foreach(d.runTest)(t => t._1 >> {
-//          t._2.apply()
-//        })
-//      }
-//    }
-//  }
+  //  "run real.txt" >> {
+  //    val txt = Source.fromInputStream(getClass.getResourceAsStream("/real.txt")).mkString
+  //    val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
+  //    val variant = variants.variant("Standard [No Units]").get
+  //    val parsers = DatcParser(variant)
+  //    val datcs = parsers.parse(txt).right.get
+  //    Fragments.foreach(datcs.zipWithIndex) { case (d, i) =>
+  //      s"$i ${d.title}" >> {
+  //        Fragments.foreach(d.runTest)(t => t._1 >> {
+  //          t._2.apply()
+  //        })
+  //      }
+  //    }
+  //  }
   "run datc_v2.4_06.txt" >> {
     val txt = Source.fromInputStream(getClass.getResourceAsStream("/datc_v2.4_06.txt")).mkString
     val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
@@ -33,13 +33,13 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
-      "6.B.10" // wrong coast
-      , "6.B.11" // wrong coast
-      , "6.B.14" // adjustment
-      , "6.F.17 (Pandin's extended paradox)" // wrong test case (forgetted dislodged)
-      , "6.F.18" // paradox, difficult
-      , "6.F.23" // paradox, difficult
-      , "6.F.24" // paradox, difficult
+      "6.B.10" // TODO: wrong coast
+      , "6.B.11" // TODO: wrong coast
+      , "6.B.14" // TODO: adjustment
+      , "6.F.17 (Pandin's extended paradox)" // TODO: wrong test case (forgetted dislodged)
+      , "6.F.18" // TODO: paradox, difficult
+      , "6.F.23" // TODO: paradox, difficult
+      , "6.F.24" // TODO: paradox, difficult
       , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {

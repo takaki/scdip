@@ -44,7 +44,7 @@ object OrderState {
 
     def checkMoves(orderState: OrderState): OrderState = {
       orderState.convoyGroups.foldLeft(orderState) {
-        case (os, (m, cs)) if !os.worldMap.canConvoy(m.src.province, m.dst.province) => os.setMark(m, VoidMark("no path")).delConvoy(m)
+        case (os, (m, _)) if !os.worldMap.canConvoy(m.src.province, m.dst.province) => os.setMark(m, VoidMark("no path")).delConvoy(m)
         case (os, (m, cs)) => if (os.worldMap.canConvoy(m.src.province, m.dst.province, orderState.orders.collect {
           case (o) if o.unitType == Fleet => o.src.province
         }.toSet)) {
@@ -370,7 +370,7 @@ object OrderState {
     }
 
     def delSupportTarget(m: MoveOrder): SupportRecord = {
-      copy(_moveCount = _moveCount.filterNot { case (s, o) => o == m })
+      copy(_moveCount = _moveCount.filterNot { case (_, o) => o == m })
     }
 
     def supportTarget(supportOrder: SupportOrder): Option[Order] = supportOrder match {
@@ -379,11 +379,10 @@ object OrderState {
     }
 
     def supportCount(order: Order, markRecord: MarkRecord): Int = order match {
-      case (o: NonMoveOrder) => _holdCount.count { case (k, v) => v == order }
-      case (m: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[VoidMark]) => _holdCount.count { case (k, v) => v == order }
-      case (m: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (k, v) => v == order }
-      //      case (m: MoveOrder) if markRecord.getMark(order).isDefined => 0
-      case (m: MoveOrder) => _moveCount.count { case (k, v) => v == order }
+      case (_: NonMoveOrder) => _holdCount.count { case (_, v) => v == order }
+      case (_: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[VoidMark]) => _holdCount.count { case (_, v) => v == order }
+      case (_: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (_, v) => v == order }
+      case (_: MoveOrder) => _moveCount.count { case (_, v) => v == order }
     }
 
 
@@ -396,7 +395,7 @@ object OrderState {
     }
 
     def delNoHelpTarget(moveOrder: MoveOrder): SupportRecord = {
-      copy(_noHelps = _noHelps.filterNot { case (s, o) => o == moveOrder })
+      copy(_noHelps = _noHelps.filterNot { case (_, o) => o == moveOrder })
     }
 
     def getNoHelpList(moveOrder: MoveOrder): Seq[SupportMoveOrder] = {
@@ -404,7 +403,7 @@ object OrderState {
     }
 
     def supportCountNH(moveOrder: MoveOrder): Int = {
-      _moveCount.count { case (k, v) => v == moveOrder } - getNoHelpList(moveOrder).size
+      _moveCount.count { case (_, v) => v == moveOrder } - getNoHelpList(moveOrder).size
     }
 
 
