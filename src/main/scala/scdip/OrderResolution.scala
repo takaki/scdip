@@ -166,7 +166,7 @@ object OrderState {
   private def checkDisruption(orderState: OrderState): OrderState = {
     orderState.convoyGroups.foldLeft(orderState) {
       case (os, (m, cs)) =>
-        val safe = cs.filter(c => os.uniqueHighestSupportedOrder(c.src.province).fold(true)(ho => ho.power == c.power))
+        val safe = cs.filter(c => os.uniqueStrongOrder(c.src.province).fold(true)(ho => ho.power == c.power))
         if (m.canConvoy(os.worldMap, safe.toSeq)) {
           os
         } else {
@@ -180,10 +180,10 @@ object OrderState {
     def impl0(orderState: OrderState) = {
       orderState.convoyAllTargets.foldLeft(orderState) {
         case (os, m) =>
-          if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
+          if (os.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
             impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
           } else {
-            if (os._markRecord.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
+            if (os.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
               (cutSupport(_: OrderState, m, "step5-1")).andThen(impl2(_: OrderState, m))(os.delMark(m))
             } else {
               os
@@ -230,9 +230,7 @@ object OrderState {
   }
 
   private def bounce(orderState: OrderState, moveOrder: MoveOrder, message: String = ""): OrderState = {
-    orderState.setMark(moveOrder, Bounce(message))
-      //      .delNoHelpTarget(moveOrder).delSupportTarget(moveOrder)
-      .addCombatList(moveOrder.src.province, moveOrder)
+    orderState.setMark(moveOrder, Bounce(message)).addCombatList(moveOrder.src.province, moveOrder)
   }
 
   private def step6to9(orderState: OrderState): OrderState = {
@@ -249,16 +247,17 @@ object OrderState {
 
   // Step 7. Mark Bounces Suffered by Understrength Attackers
   private def step7(orderState: OrderState): OrderState = {
-    val bounced = orderState._combatListRecord.provinces.flatMap(province => {
-      orderState._combatListRecord.orders(province).collect {
+    val bounced = orderState.combatListSeq.flatMap {
+      case (p, cos) => cos.collect {
         case (m: MoveOrder) if orderState.notMarked(m) => m
       }.filter(m =>
-        orderState._combatListRecord.orders(province).filter(o => o != m).exists {
-          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src.province == province => 0 >= orderState.supportCount(m)
+        cos.filter(o => o != m).exists {
+          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src.province == p => 0 >= orderState.supportCount(m)
           case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
         }
       )
-    })
+    }
+
     if (bounced.isEmpty) {
       orderState
     } else {
@@ -270,23 +269,22 @@ object OrderState {
 
   // Step 8. Mark Bounces Caused by Inability to Self-Dislodge
   private def step8(orderState: OrderState): OrderState = {
-    orderState._combatListRecord.provinces.flatMap(province => {
-      val highest: Int = orderState.highestSupportCount(province)
-      val highestOrders = orderState._combatListRecord.orders(province).collect {
-        case (m: MoveOrder) if orderState.supportCount(m) == highest => m
-      }
-      if (highestOrders.size == 1) {
-        highestOrders.collect {
-          case (m: MoveOrder) if orderState.notMarked(m) => m
+    orderState.combatListSeq.flatMap {
+      case (p, cos) =>
+        val highest: Int = orderState.highestSupportCount(p)
+        val highestOrders = cos.collect {
+          case (m: MoveOrder) if orderState.supportCount(m) == highest => m
         }
-      } else {
-        Seq.empty
-      }
-    }).foldLeft(orderState) {
+        if (highestOrders.size == 1) {
+          highestOrders.filter(orderState.notMarked)
+        } else {
+          Seq.empty
+        }
+    }.foldLeft(orderState) {
       case (os, m) => os.orders.find(h => h.src ~~ m.dst).fold(os) {
         case (o: MoveOrder) if orderState.notMarked(o) => os
         case nm if nm.power == m.power => step6to8(bounce(os, m, "step8 self-attack"))
-        case nm => if (os.supportCountNH(m) > os._combatListRecord.orders(m.dst.province).filterNot(o => o == m).map(o => os.supportCount(o)).reduceOption(_ max _).getOrElse(0)) {
+        case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).filterNot(o => o == m).map(o => os.supportCount(o)).reduceOption(_ max _).getOrElse(0)) {
           os
         } else {
           step6to8(bounce(os, m, "step8-NH"))
@@ -305,7 +303,7 @@ object OrderState {
   private def step10(orderState: OrderState): OrderState = {
     @scala.annotation.tailrec
     def unbounce(orderState: OrderState, province: Province): OrderState = {
-      val orders = orderState._combatListRecord.orders(province)
+      val orders = orderState.combatOrders(province)
       if (orders.isEmpty) {
         orderState
       } else {
@@ -543,16 +541,16 @@ case class OrderState(orders: Seq[Order],
 
   def supportTarget(s: SupportOrder): Option[Order] = _supportRecord.supportTarget(s)
 
-  def uniqueHighestSupportedOrder(province: Province): Option[Order] = {
-    val (_, os) = orders.filter {
+  def uniqueStrongOrder(province: Province): Option[Order] = {
+    val (_, mos) = orders.filter {
       case (m: MoveOrder) => m.dst ~~ province
       case (o) => o.src ~~ province
-    }.map(o => o -> _supportRecord.supportCount(o, _markRecord)).groupBy {
+    }.map(o => (o, _supportRecord.supportCount(o, _markRecord))).groupBy {
       case (_, sc) => sc
     }.maxBy {
       case (sc, _) => sc
     }
-    if (os.size == 1) Option(os.head._1) else None
+    if (mos.size == 1) Option(mos.head._1) else None
   }
 
   def highestSupportCount(province: Province): Int = {
@@ -608,6 +606,9 @@ case class OrderState(orders: Seq[Order],
   def combatListAdd(province: Province, order: Order): OrderState = {
     copy(_combatListRecord = _combatListRecord.add(order.src.province, order))
   }
+
+  def combatListSeq: Seq[(Province, Set[Order])] = _combatListRecord.toSeq
+  def combatOrders(province: Province): Seq[Order] = _combatListRecord.orders(province)
 
   // dislodged list
   def addDislodged(order: Order, moveOrder: MoveOrder): OrderState = copy(_dislodgedList = _dislodgedList.add(order, moveOrder))
