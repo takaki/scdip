@@ -12,6 +12,20 @@ import scala.xml.XML
 @RunWith(classOf[JUnitRunner])
 class DatcSpecs extends Specification {
 
+//  "run real.txt" >> {
+//    val txt = Source.fromInputStream(getClass.getResourceAsStream("/real.txt")).mkString
+//    val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))
+//    val variant = variants.variant("Standard [No Units]").get
+//    val parsers = DatcParser(variant)
+//    val datcs = parsers.parse(txt).right.get
+//    Fragments.foreach(datcs.zipWithIndex) { case (d, i) =>
+//      s"$i ${d.title}" >> {
+//        Fragments.foreach(d.runTest)(t => t._1 >> {
+//          t._2.apply()
+//        })
+//      }
+//    }
+//  }
   "run datc_v2.4_06.txt" >> {
     val txt = Source.fromInputStream(getClass.getResourceAsStream("/datc_v2.4_06.txt")).mkString
     val variants = VariantList(XML.load(getClass.getResourceAsStream("/variants.xml")))

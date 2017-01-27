@@ -161,7 +161,7 @@ object Phase extends PhaseParser {
 }
 
 trait PhaseParser extends RegexParsers {
-  def phase: Parser[Phase] = season ~ (year <~ opt(",")) ~ phasetype ^^ { case (s ~ y ~ pt) => Phase(y, s, pt) }
+  def phase: Parser[Phase] = season ~ (year <~ opt(",")) ~ (opt("(") ~> phasetype <~ opt(")")) ^^ { case (s ~ y ~ pt) => Phase(y, s, pt) }
 
   def season: Parser[Season] = (spring | fall) <~ opt(",")
 
