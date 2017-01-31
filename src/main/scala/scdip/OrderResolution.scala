@@ -5,6 +5,9 @@ import scdip.OrderMark._
 import scdip.OrderState._
 import scdip.UnitType.{Army, Fleet}
 
+import scalax.collection.Graph
+import scalax.collection.GraphEdge.DiEdge
+
 // ref: http://www.floc.net/dpjudge/?page=Algorithm
 
 object OrderState {
@@ -113,29 +116,37 @@ object OrderState {
   }
 
   private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity, inStep9: Boolean = false): OrderState = {
-    def isNotMarked(os: OrderState, s: SupportOrder): Boolean = {
-      os.getMark(s).fold(true)(m => !m.isInstanceOf[CutMark] && !m.isInstanceOf[VoidMark])
+    def isInvalidSupport(os: OrderState, s: SupportOrder): Boolean = {
+      os.getMark(s).exists(m => m.isInstanceOf[CutMark] || m.isInstanceOf[VoidMark])
     }
 
-    orderState.supports.foldLeft(orderState) {
-      case (os, s) if moveOrder.dst ~~ s.src => if (isNotMarked(os, s) && s.power != moveOrder.power &&
-        (!os.isConvoyTarget(moveOrder) ||
-          os.isConvoyTarget(moveOrder) && os.supportTarget(s).fold(true) {
-            case (m: MoveOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(c => c.src ~~ m.dst)) // can't cut support when disrupt convoy route
-            case (c: ConvoyOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(cv => cv == c))
-            case _ => true
-          })) s match {
-        case sh: SupportHoldOrder => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).delSupport(sh))
-        case sm: SupportMoveOrder => if (inStep9 || !(sm.to ~~ moveOrder.src)) {
-          after(os.setMark(sm, CutMark(s"$message; $moveOrder")).delSupport(sm).delNoHelpList(sm))
-        } else {
-          os
-        }
-      } else {
-        os
+    orderState.supports.filter(s => moveOrder.dst ~~ s.src)
+      .filterNot(s => // condition list of can't cut
+        isInvalidSupport(orderState, s) ||
+          s.power == moveOrder.power ||
+          (orderState.isConvoyTarget(moveOrder) && orderState.supportTarget(s).exists {
+            case (c: ConvoyOrder) if !orderState.getMark(c).exists(_.isInstanceOf[VoidMark]) =>
+              orderState.convoyFleets(moveOrder).
+                forall {
+                  c0 => orderState.orderGraph.get(c).findCycle.exists(cycle => cycle.nodes.exists(o => o.value == c0))
+                }
+            case (supportedMove: MoveOrder) =>
+              (for {
+                c <- orderState.convoys if c.src ~~ supportedMove.dst && !orderState.getMark(c).exists(_.isInstanceOf[VoidMark])
+                c0 <- orderState.convoyFleets(moveOrder)
+              } yield (c, c0)).forall {
+                case (c, c0) => orderState.orderGraph.get(c).findCycle.exists(cycle => cycle.nodes.exists(o => o.value == c0))
+              }
+            case _ => false
+          }) ||
+          (!inStep9 && orderState.supportTarget(s).exists {
+            case (m: MoveOrder) => m.dst ~~ moveOrder.src
+            case _ => false
+          }))
+      .foldLeft(orderState) {
+        case (os, sh: SupportHoldOrder) => after(os.setMark(sh, CutMark(s"$message; $moveOrder")).delSupport(sh))
+        case (os, sm: SupportMoveOrder) => after(os.setMark(sm, CutMark(s"$message; $moveOrder")).delSupport(sm).delNoHelpList(sm))
       }
-      case (os, _) => os
-    }
   }
 
   // Step 4. Mark Support Cuts Made by Convoyers and Mark Endangered Convoys
@@ -144,7 +155,7 @@ object OrderState {
     def impl(orderState: OrderState): OrderState = {
       orderState.convoyAllTargets.foldLeft(orderState) {
         case (os, m) => if (os.notMarked(m)) {
-          impl2(cutSupport(os, m, "step4-impl"), m)
+          impl2(cutSupport(os, m, "step4-cut-by-convoyed"), m)
         } else {
           os.setMark(m, ConvoyUnderAttack())
         }
@@ -284,7 +295,9 @@ object OrderState {
       case (os, m) => os.orders.find(h => h.src ~~ m.dst).fold(os) {
         case (o: MoveOrder) if orderState.notMarked(o) => os
         case nm if nm.power == m.power => step6to8(bounce(os, m, "step8 self-attack"))
-        case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).collect { case o if o != m => os.supportCount(o) }.reduceOption(_ max _).getOrElse(0)) {
+        case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).collect {
+          case o if o != m => os.supportCount(o)
+        }.reduceOption(_ max _).getOrElse(0)) {
           os
         } else {
           step6to8(bounce(os, m, "step8-NH"))
@@ -475,6 +488,7 @@ case class OrderResults(results: Seq[OrderResult],
                         combatListRecord: CombatListRecord,
                         dislodgedList: DislodgedList) {
 
+
   def retreatAreas(worldMap: WorldMap): Seq[(Order, Set[Location])] = dislodgedList._dislodged.toSeq.map {
     case (o, m) => (o, worldMap.neighbours(o.src, combatListRecord.provinces.toSet + m.src.province))
   }
@@ -497,7 +511,24 @@ case class OrderState(orders: Seq[Order],
                       _convoySucceeded: ConvoySucceeded = ConvoySucceeded(),
                       _combatListRecord: CombatListRecord = CombatListRecord(),
                       _dislodgedList: DislodgedList = DislodgedList()) {
+  lazy val orderGraph: Graph[Order, DiEdge] = Graph.from(edges = {
+    (for {
+      x <- orders
+      y <- orders
+    } yield (x, y)).collect {
+      case (c: ConvoyOrder, m: MoveOrder) if c.from ~~ m.src && c.to ~~ m.dst => DiEdge(c, m)
+      case (s: SupportMoveOrder, m: MoveOrder) if s.from ~~ m.src && s.to ~~ m.dst => DiEdge(s, m)
+      case (s: SupportHoldOrder, nm: NonMoveOrder) if s.targetSrc ~~ nm.src => DiEdge(s, nm)
+      case (m: MoveOrder, s: SupportOrder) if m.dst ~~ s.src => DiEdge(m, s)
+      case (m: MoveOrder, c: ConvoyOrder) if m.dst ~~ c.src => DiEdge(m, c)
+    }
+  })
 
+  def isParadox(order0: Order, order1: Order): Boolean = {
+    (for {c1 <- orderGraph.get(order0).findCycle
+          c2 <- orderGraph.get(order1).findCycle
+    } yield c1.sameAs(c2)).getOrElse(false)
+  }
 
   def resolve: OrderResults = {
     OrderState.steps(this).toOrderResults

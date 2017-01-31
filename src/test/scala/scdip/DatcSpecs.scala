@@ -43,15 +43,17 @@ class DatcSpecs extends Specification {
       , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 123
+    val sep = 100
     // 75
     val end = 123
     "2nd" >> {
-      Fragments.foreach(datcs.slice(sep, end))(d => d.title >> {
-        Fragments.foreach(d.runTest)(t => t._1 >> {
-          t._2.apply()
-        })
-      })
+      Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case(d,i) =>
+        s"${i+sep} ${d.title}" >> {
+          Fragments.foreach(d.runTest)(t => t._1 >> {
+            t._2.apply()
+          })
+        }
+      }
     }
     "1st" >> {
       Fragments.foreach(datcs.zipWithIndex.slice(0, sep)) { case (d, i) =>
