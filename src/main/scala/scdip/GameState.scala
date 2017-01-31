@@ -23,22 +23,9 @@ case class MovementState(turn: Turn,
         case _ => None
       }
     }
-    val targets: Set[Province] = moves.map(_.dst.province).toSet
-    //    val dislodged: Seq[Location] = orderResults.results.collect {
-    //      case (or: FailureResult) if targets.contains(or.order.src.province) => or.order.src
-    //      case (or: SuccessResult) if targets.contains(or.order.src.province) && !or.order.isInstanceOf[MoveOrder] => or.order.src
-    //    }
-    val dislodged: Seq[Location] = orderResults.dislodgedList.provinces
-    val clearedUnitLocation = dislodged.foldLeft(unitLocation) { (u, l) => u.clear(l) }
-    val newUnitLocation = move(clearedUnitLocation, moves)
-    val retreatAreas = orderResults.dislodgedList._dislodged.toSeq.map {
-      case (o, m) => (o, worldMap.neighbours(o.src, orderResults.combatListRecord.provinces.toSet + m.src.province))
-    }
-    val ds: Seq[Location] = retreatAreas.collect {
-      case (o, ls) if ls.nonEmpty => o.src
-    }
+    val newUnitLocation = move(orderResults.dislodgedList.provinces.foldLeft(unitLocation) { (u, l) => u.clear(l) }, moves)
     // TODO: disband
-    RetreatState(turn, supplyCenterInfo, newUnitLocation, unitLocation.getUnits(ds))
+    RetreatState(turn, supplyCenterInfo, newUnitLocation, unitLocation.getUnits(orderResults.retreatLocations(worldMap)))
   }
 
   @scala.annotation.tailrec

@@ -113,12 +113,12 @@ object OrderState {
   }
 
   private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity, inStep9: Boolean = false): OrderState = {
-    def cond1(os: OrderState, s: SupportOrder): Boolean = {
+    def isNotMarked(os: OrderState, s: SupportOrder): Boolean = {
       os.getMark(s).fold(true)(m => !m.isInstanceOf[CutMark] && !m.isInstanceOf[VoidMark])
     }
 
     orderState.supports.foldLeft(orderState) {
-      case (os, s) if moveOrder.dst ~~ s.src => if (cond1(os, s) && s.power != moveOrder.power &&
+      case (os, s) if moveOrder.dst ~~ s.src => if (isNotMarked(os, s) && s.power != moveOrder.power &&
         (!os.isConvoyTarget(moveOrder) ||
           os.isConvoyTarget(moveOrder) && os.supportTarget(s).fold(true) {
             case (m: MoveOrder) => moveOrder.canConvoy(os.worldMap, os.convoyFleets(moveOrder).filterNot(c => c.src ~~ m.dst)) // can't cut support when disrupt convoy route
@@ -474,6 +474,19 @@ case class OrderResults(results: Seq[OrderResult],
                         convoySucceeded: ConvoySucceeded,
                         combatListRecord: CombatListRecord,
                         dislodgedList: DislodgedList) {
+
+  def retreatAreas(worldMap: WorldMap): Seq[(Order, Set[Location])] = dislodgedList._dislodged.toSeq.map {
+    case (o, m) => (o, worldMap.neighbours(o.src, combatListRecord.provinces.toSet + m.src.province))
+  }
+
+  def retreatLocations(worldMap: WorldMap): Seq[Location] = retreatAreas(worldMap).collect {
+    case (o, ls) if ls.nonEmpty => o.src
+  }
+
+  def disbandLocations(worldMap: WorldMap): Seq[Location] = retreatAreas(worldMap).collect {
+    case (o, ls) if ls.isEmpty => o.src
+  }
+
 }
 
 case class OrderState(orders: Seq[Order],
