@@ -87,7 +87,7 @@ object OrderState {
         case (os, s: SupportHoldOrder) =>
           s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
             case (nm: NonMoveOrder) => os.addSupport(nm, s)
-            case (m: MoveOrder) if os.getMark(m).fold(false)(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
+            case (m: MoveOrder) if os.getMark(m).exists(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
             case _ => os
           }
         case (os, s: SupportMoveOrder) =>
@@ -131,7 +131,7 @@ object OrderState {
               (for {
                 c <- orderState.convoys if c.src ~~ supportedMove.dst && !orderState.getMark(c).exists(_.isInstanceOf[VoidMark])
                 c0 <- orderState.convoyFleets(moveOrder)
-              } yield (c, c0)).forall{
+              } yield (c, c0)).forall {
                 case (c, c0) => orderState.isParadox(c, c0)
               }
             case _ => false
@@ -174,7 +174,7 @@ object OrderState {
   private def checkDisruption(orderState: OrderState): OrderState = {
     orderState.convoyGroups.foldLeft(orderState) {
       case (os, (m, cs)) =>
-        val safe = cs.filter(c => os.uniqueStrongestOrder(c.src.province).fold(true)(ho => ho.power == c.power))
+        val safe = cs.filter(c => !os.uniqueStrongestOrder(c.src.province).exists(ho => ho.power != c.power))
         if (m.canConvoy(os.worldMap, safe.toSeq)) {
           os
         } else {
@@ -188,10 +188,10 @@ object OrderState {
     def impl0(orderState: OrderState) = {
       orderState.convoyAllTargets.foldLeft(orderState) {
         case (os, m) =>
-          if (os.getMark(m).fold(false)(_.isInstanceOf[ConvoyEndangered])) {
+          if (os.getMark(m).exists(_.isInstanceOf[ConvoyEndangered])) {
             impl1(os.setMark(m, NoConvoy("step5-endangered")).delSupportTarget(m).delCombatList(m).addCombatList(m.src.province, m), m)
           } else {
-            if (os.getMark(m).fold(false)(_.isInstanceOf[ConvoyUnderAttack])) {
+            if (os.getMark(m).exists(_.isInstanceOf[ConvoyUnderAttack])) {
               (impl2(_: OrderState, m)).compose(cutSupport(_: OrderState, m, "step5-1"))(os.delMark(m))
             } else {
               os
@@ -260,7 +260,8 @@ object OrderState {
         case (m: MoveOrder) if orderState.notMarked(m) => m
       }.filter(m =>
         cos.filter(o => o != m).exists {
-          case (o: MoveOrder) if orderState.getMark(o).fold(false)(_.isInstanceOf[Bounce]) && o.src ~~ p => 0 >= orderState.supportCount(m)
+          case (o: MoveOrder) if orderState.getMark(o).exists(_.isInstanceOf[Bounce]) && o.src ~~ p => 0 >= orderState.supportCount(m)
+          case (sh: SupportHoldOrder) if orderState.supportTarget(sh).exists(s => orderState.convoyFleets(m).contains(s)) => orderState.delSupport(sh).uniqueStrongestOrder(sh.targetSrc.province).isDefined // F.18
           case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
         }
       )
@@ -324,7 +325,7 @@ object OrderState {
         }
         if (maximum.size == 1) {
           val (max, _) = maximum.head
-          if (orderState.getMark(max).fold(false)(_.isInstanceOf[Bounce])) {
+          if (orderState.getMark(max).exists(_.isInstanceOf[Bounce])) {
             val os = orderState.delMark(max)
             if (os.isDislodged(max)) {
               os.delDislodged(max)
@@ -390,8 +391,8 @@ object OrderState {
 
     def supportCount(order: Order, markRecord: MarkRecord): Int = order match {
       case (_: NonMoveOrder) => _holdCount.count { case (_, v) => v == order }
-      case (_: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[VoidMark]) => _holdCount.count { case (_, v) => v == order }
-      case (_: MoveOrder) if markRecord.getMark(order).fold(false)(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (_, v) => v == order }
+      case (_: MoveOrder) if markRecord.getMark(order).exists(_.isInstanceOf[VoidMark]) => _holdCount.count { case (_, v) => v == order }
+      case (_: MoveOrder) if markRecord.getMark(order).exists(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (_, v) => v == order }
       case (_: MoveOrder) => _moveCount.count { case (_, v) => v == order }
     }
 
