@@ -126,16 +126,13 @@ object OrderState {
           s.power == moveOrder.power ||
           (orderState.isConvoyTarget(moveOrder) && orderState.supportTarget(s).exists {
             case (c: ConvoyOrder) if !orderState.getMark(c).exists(_.isInstanceOf[VoidMark]) =>
-              orderState.convoyFleets(moveOrder).
-                forall {
-                  c0 => orderState.orderGraph.get(c).findCycle.exists(cycle => cycle.nodes.exists(o => o.value == c0))
-                }
+              orderState.convoyFleets(moveOrder).forall(c0 => orderState.isParadox(c, c0))
             case (supportedMove: MoveOrder) =>
               (for {
                 c <- orderState.convoys if c.src ~~ supportedMove.dst && !orderState.getMark(c).exists(_.isInstanceOf[VoidMark])
                 c0 <- orderState.convoyFleets(moveOrder)
-              } yield (c, c0)).forall {
-                case (c, c0) => orderState.orderGraph.get(c).findCycle.exists(cycle => cycle.nodes.exists(o => o.value == c0))
+              } yield (c, c0)).forall{
+                case (c, c0) => orderState.isParadox(c, c0)
               }
             case _ => false
           }) ||
@@ -524,11 +521,8 @@ case class OrderState(orders: Seq[Order],
     }
   })
 
-  def isParadox(order0: Order, order1: Order): Boolean = {
-    (for {c1 <- orderGraph.get(order0).findCycle
-          c2 <- orderGraph.get(order1).findCycle
-    } yield c1.sameAs(c2)).getOrElse(false)
-  }
+  def isParadox(c: ConvoyOrder, c0: ConvoyOrder): Boolean =
+    orderGraph.get(c).findCycle.exists(cycle => cycle.nodes.exists(o => o.value == c0))
 
   def resolve: OrderResults = {
     OrderState.steps(this).toOrderResults
