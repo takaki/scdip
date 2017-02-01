@@ -50,3 +50,7 @@ Data structure ideas and Some data files are came from jDip.
 * variants.xml
 * datac_v2.4_06.txt
 * real.txt
+
+## References
+* http://web.inter.nl.net/users/L.B.Kruijswijk/
+* http://www.floc.net/dpjudge/?page=Algorithm
