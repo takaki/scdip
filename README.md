@@ -1,5 +1,5 @@
 # scDip
-Diplomacy order resolution library for scala language.
+A Diplomacy order resolution library for Scala.
 
 # LICENSE
 
