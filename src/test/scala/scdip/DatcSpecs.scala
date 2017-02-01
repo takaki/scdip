@@ -33,20 +33,18 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
-      "6.B.10" // TODO: wrong coast
-      , "6.B.11" // TODO: wrong coast
-      , "6.B.14" // TODO: adjustment
-//      , "6.F.17 (Pandin's extended paradox)" // TODO: wrong test case (forgetted dislodged)
-//      , "6.F.18" // TODO: paradox, difficult
+      //      "6.B.10" // TODO: wrong coast
+      //      , "6.B.11" // TODO: wrong coast
+      "6.B.14" // TODO: adjustment
       , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 99
+    val sep = 25
     // 75
-    val end = 127
+    val end = 129
     "2nd" >> {
-      Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case(d,i) =>
-        s"${i+sep} ${d.title}" >> {
+      Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>
+        s"${i + sep} ${d.title}" >> {
           Fragments.foreach(d.runTest)(t => t._1 >> {
             t._2.apply()
           })

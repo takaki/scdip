@@ -1,7 +1,9 @@
 package scdip
 
+import scdip.Order.MoveOrder
 import scdip.PhaseType.{Adjustment, Movement, Retreat}
 import scdip.Season.{Fall, Spring}
+import scdip.UnitType.Fleet
 
 import scala.collection.immutable.TreeMap
 import scala.util.parsing.combinator.RegexParsers
@@ -61,7 +63,7 @@ case class Variant(name: String,
     val owner = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._3 == "none") None else Option(power(d._3)))).toMap
     val map = initialState.map(d => {
       val unitType = UnitType.parse(d._3)
-      val coast:Option[Coast] = if (d._4.isEmpty) Option(unitType.defaultCoast) else Coast.parse(d._4)
+      val coast: Option[Coast] = if (d._4.isEmpty) Option(unitType.defaultCoast) else Coast.parse(d._4)
       Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
     }).toMap
 
@@ -98,8 +100,13 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
     locationUnitMap.toList.map { case (l, g) => UnitState(l, g) }
   }
 
-  def filterOrders(orders: Seq[Order]): Seq[Order] = {
-    orders.filter(o => locationUnitMap.exists{case(l, gu) => o.src ~~ l && o.gameUnit == gu}) // TODL o.toGameUnit
+  def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
+    orders.collect {
+      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src == l && o.gameUnit == gu } => o
+      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } && o.unitType == Fleet =>
+        locationUnitMap.find { case (l, gu) => o.src ~~ l && o.gameUnit == gu }.fold(o) { case (l, gu) => o.copy(src = l, dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
+      case (o: NonMoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } => o
+    }
   }
 }
 

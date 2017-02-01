@@ -15,7 +15,7 @@ case class MovementState(turn: Turn,
   val phaseType = PhaseType.Movement
 
   override def next(orders: Seq[Order]): GameState = {
-    val orderResults = OrderState(unitLocation.filterOrders(orders), worldMap).resolve
+    val orderResults = OrderState(unitLocation.filterOrders(orders,worldMap), worldMap).resolve
 
     val moves: Seq[MoveOrder] = orderResults.results.flatMap {
       case (or) => or.flatRun {
