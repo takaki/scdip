@@ -186,6 +186,34 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
     }
   }
 
+  // 6.G.7
+  def validConvoy(from: Province, to: Province, convoy: Province): Boolean = {
+    if (coastalProvinces.contains(from) && coastalProvinces.contains(to) && seaProvinces(convoy)) {
+      val inFrom = graph.nodes.collect { case (n) if n.province == from && n.coast.exists(_.isSea) => DiEdge(Location(n.province, Option(Coast.Land)), n.value) }
+      val inTo = graph.nodes.collect { case (n) if n.province == to && n.coast.exists(_.isSea) => DiEdge(n.value, Location(n.province, Option(Coast.Land))) }
+
+      val fromCoast = diEdges.filter(e => e.from.province == from && e.from.coast.exists(_.isSea) && seaProvinces.contains(e.to.province))
+      val toCoast = diEdges.filter(e => seaProvinces.contains(e.from.province) && e.to.province == to && e.to.coast.exists(_.isSea))
+      val convoyEdges = diEdges.filter(e => seaProvinces.contains(e.from.province))
+
+      val gSeaPlus0 = Graph.from(edges = inFrom ++ fromCoast ++ convoyEdges)
+      val gSeaPlus1 = Graph.from(edges = convoyEdges ++ toCoast ++ inTo)
+      val path0 = for {
+        n0 <- gSeaPlus0 find Location(from, Option(Coast.Land))
+        n1 <- gSeaPlus0 find Location(convoy, Option(Coast.Single))
+        path <- n0 pathTo n1
+      } yield path
+      val path1 = for {
+        n0 <- gSeaPlus1 find Location(convoy, Option(Coast.Single))
+        n1 <- gSeaPlus1 find Location(to, Option(Coast.Land))
+        path <- n0 pathTo n1
+      } yield path
+      path0.isDefined && path1.isDefined
+    } else {
+      false
+    }
+  }
+
   def neighbours(origin: Location, ngProvinces: Set[Province] = Set.empty): Set[Location] = {
     diEdges.filter(e => e.from == origin && !ngProvinces.contains(e.to.province)).map(e => e.to).toSet
   }

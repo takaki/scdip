@@ -20,7 +20,7 @@ Diplomacy order resolution library for scala language.
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ```
 
-## jDip
+## jDip LICENSE
 
 Data structure ideas and Some data files are came from jDip.
 

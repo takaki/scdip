@@ -22,10 +22,10 @@ object OrderState {
       case (os, m) if m.unitType == Army && m.explictConvoy =>
         os.addConvoys(m, os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to))
       case (os, m) if m.unitType == Army =>
-        val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to)
+        val convoys = os.convoys.filter(c => m.src ~~ c.from && m.dst ~~ c.to && orderState.worldMap.validConvoy(c.from.province, c.to.province, c.src.province))
+        // filter related convoy only
         if (m.isNeighbour(os.worldMap)) {
           if (convoys.exists(c => c.power == m.power)) {
-            //              && os.worldMap.canConvoy(m.src.province, m.dst.province, Set(c.src.province))
             os.addConvoys(m, convoys)
           } else {
             os

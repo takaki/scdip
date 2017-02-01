@@ -36,10 +36,10 @@ class DatcSpecs extends Specification {
       //      "6.B.10" // TODO: wrong coast
       //      , "6.B.11" // TODO: wrong coast
       "6.B.14" // TODO: adjustment
-      , "6.G.7" // TODO: neighbourconvoy, need special path check
+//      , "6.G.7" // TODO: neighbourconvoy, need special path check
     ).contains(p.title))
     //    Fragments.foreach(datcs.slice(0,3000))(d => d.title >> {
-    val sep = 25
+    val sep = 116
     // 75
     val end = 129
     "2nd" >> {
