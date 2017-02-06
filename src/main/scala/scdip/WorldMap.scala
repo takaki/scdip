@@ -117,15 +117,15 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   private val graph: Graph[Location, DiEdge] = Graph.from(edges = diEdges)
   private val provinces = diEdges.map(de => de.from.province).distinct
 
-  private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.fold(false)(_.isLand)).map(de => de.from.province).toSet
-  private val fleetProvinces: Set[Province] = diEdges.filter(de => de.from.coast.fold(false)(_.isSea)).map(de => de.from.province).toSet
+  private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.exists(_.isLand)).map(de => de.from.province).toSet
+  private val fleetProvinces: Set[Province] = diEdges.filter(de => de.from.coast.exists(_.isSea)).map(de => de.from.province).toSet
 
   private val seaProvinces = fleetProvinces -- armyProvinces
   private val landProvinces = armyProvinces -- fleetProvinces
   private val coastalProvinces = armyProvinces & fleetProvinces
 
-  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.fold(false)(_.isLand))
-  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.fold(false)(_.isSea))
+  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.exists(_.isLand))
+  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.exists(_.isSea))
 
   private val armyGraph: Graph[Location, DiEdge] = Graph.from(edges = armyEdges)
   private val fleetGraph: Graph[Location, DiEdge] = Graph.from(edges = fleetEdges)
@@ -165,12 +165,12 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   def canConvoy(from: Province, to: Province, convoys: Set[Province] = seaProvinces): Boolean = {
     if (coastalProvinces.contains(from) && coastalProvinces.contains(to)) {
-      val inFrom = graph.nodes.collect { case (n) if n.province == from && n.coast.fold(false)(_.isSea) => DiEdge(Location(n.province, Option(Coast.Land)), n.value) }
-      val inTo = graph.nodes.collect { case (n) if n.province == to && n.coast.fold(false)(_.isSea) => DiEdge(n.value, Location(n.province, Option(Coast.Land))) }
+      val inFrom = graph.nodes.collect { case (n) if n.province == from && n.coast.exists(_.isSea) => DiEdge(Location(n.province, Option(Coast.Land)), n.value) }
+      val inTo = graph.nodes.collect { case (n) if n.province == to && n.coast.exists(_.isSea) => DiEdge(n.value, Location(n.province, Option(Coast.Land))) }
 
       val validSea = convoys & seaProvinces
-      val fromCoast = diEdges.filter(e => e.from.province == from && e.from.coast.fold(false)(c => c.isSea) && validSea.contains(e.to.province))
-      val toCoast = diEdges.filter(e => validSea.contains(e.from.province) && e.to.province == to && e.to.coast.fold(false)(c => c.isSea))
+      val fromCoast = diEdges.filter(e => e.from.province == from && e.from.coast.exists(_.isSea) && validSea.contains(e.to.province))
+      val toCoast = diEdges.filter(e => validSea.contains(e.from.province) && e.to.province == to && e.to.coast.exists(_.isSea))
       val convoyEdges = diEdges.filter(e => validSea.contains(e.from.province))
 
       val gSeaPlus = Graph.from(edges = inFrom ++ fromCoast ++ convoyEdges ++ toCoast ++ inTo)
