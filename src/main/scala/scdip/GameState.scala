@@ -5,11 +5,13 @@ import scdip.Season.{Fall, Spring}
 
 trait GameState {
   def phaseType: PhaseType
+
   def unitLocation: UnitLocation
+
   def next(orders: Seq[Order]): GameState
 }
 
-case class WorldInfo(worldMap: WorldMap,  victoryCondition: VictoryCondition)
+case class WorldInfo(worldMap: WorldMap, victoryCondition: VictoryCondition)
 
 case class MovementState(worldInfo: WorldInfo,
                          turn: Turn,
@@ -39,16 +41,28 @@ case class RetreatState(worldInfo: WorldInfo,
   val disbandUnits: Seq[UnitPosition] = orderResults.disbandUnitPosittions(worldInfo.worldMap)
 
   override def next(orders: Seq[Order]): GameState = {
-    val newUL = orders.collect {
-      case (o: MoveOrder) => o
-    }.filter(m => orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst)).foldLeft(unitLocation) {
-      case (ul, m) => ul.clear(m.src).updated(UnitPosition(m.dst, m.gameUnit))
+    val conflicts: Set[Province] = orders.collect {
+      case (m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) &&
+        orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) => m.dst.province
+    }.groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toSet
+
+    val newUL = orders.foldLeft(unitLocation) {
+      case (ul, m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) =>
+        if (orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) && !conflicts.contains(m.dst.province)) {
+          ul.updated(UnitPosition(m.dst, m.gameUnit))
+        } else {
+          ul
+        }
+      case (ul, o) if dislodgeUnits.contains(o.unitPosition) => ul.clear(o.src)
+      case (ul, o) => ul
     }
+
     turn.season match {
       case Spring => MovementState(worldInfo, turn.next, newUL, supplyCenterInfo)
-      case Fall => AdjustmentState(worldInfo, turn.next, newUL, supplyCenterInfo)
+      case Fall => AdjustmentState(worldInfo, turn, newUL, supplyCenterInfo)
     }
   }
+
 }
 
 case class AdjustmentState(worldInfo: WorldInfo,

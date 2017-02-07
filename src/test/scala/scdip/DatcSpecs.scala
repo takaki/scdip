@@ -35,9 +35,9 @@ class DatcSpecs extends Specification {
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
       "6.B.14" // TODO: adjustment
     ).contains(p.title))
-    val st = 0
-    val sep = st + 132
-    val end = st + 150
+    val st = 130
+    val sep = st + 1
+    val end = st + 15
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>
         s"${i + sep} ${d.title}" >> {
@@ -82,10 +82,11 @@ case class Datc(variant: Variant,
     } else {
       if (phase.phaseType == Retreat) {
         val iniState = variant.movementState
-        val movement = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
+        val movementOrders = preStateResult.map(_.order)
+        val movement = iniState.copy(turn = phase.turn, unitLocation = movementOrders.foldLeft(iniState.unitLocation)((ul, mo) => ul.updated(mo.unitPosition)))
         val retreat = movement.next(preStateResult.map(_.order))
         val nextState = retreat.next(orders)
-        Seq(("POSTSTATE", () => nextState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)))
+        Seq(("POSTSTATE", () => nextState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
       } else {
         Seq(("NOT IMPLEMENTED", () => 1 === 2))
       }
