@@ -53,7 +53,7 @@ case class RetreatState(worldInfo: WorldInfo,
         } else {
           ul
         }
-      case (ul, o) if dislodgeUnits.contains(o.unitPosition) => ul.clear(o.src)
+      case (ul, o) if dislodgeUnits.contains(o.unitPosition) => ul
       case (ul, o) => ul
     }
 
