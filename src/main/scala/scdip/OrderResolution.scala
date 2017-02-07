@@ -426,7 +426,7 @@ object OrderState {
 
   case class CombatListRecord(map: Map[Province, Set[Order]] = Map.empty) {
 
-    val provinces: Seq[Province] = map.keys.toSeq
+    val provinces: Seq[Province] = map.filter(p => p._2.nonEmpty).keys.toSeq
 
     def orders(province: Province): Seq[Order] = map.get(province).fold(Seq.empty[Order])(_.toSeq)
 
