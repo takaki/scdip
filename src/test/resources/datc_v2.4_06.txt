@@ -3539,7 +3539,7 @@ PRESTATE
 PRESTATE_DISLODGED
 	France: F wes
 PRESTATE_RESULTS
-	FAILURE: France: F mao-spa
+	FAILURE: France: F mao-spa/nc
 	FAILURE: France: F gas-spa/nc
 	FAILURE: France: F wes H
 	SUCCESS: Italy: F tun S F tys-wes
