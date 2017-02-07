@@ -3181,7 +3181,7 @@ PRESTATE_DISLODGED
 	Turkey: F ank
 PRESTATE_RESULTS
 	FAILURE: Turkey: F ank H
-	SUCCESS: Russia: F con S A ruh-hol
+	SUCCESS: Russia: F con S A bla-ank
 	SUCCESS: Russia: F bla-ank
 ORDERS
 	Turkey: F ank-bla			# cannot retreat to black sea! disbanded
@@ -3203,7 +3203,7 @@ PRESTATE_DISLODGED
 	Turkey: F ank
 PRESTATE_RESULTS
 	FAILURE: Turkey: F ank H
-	SUCCESS: Russia: F con S A ruh-hol
+	SUCCESS: Russia: F con S A bla-ank
 	SUCCESS: Russia: F bla-ank
 ORDERS
 	Turkey: F ank-con			# cannot retreat to con (unit there)! disbanded
