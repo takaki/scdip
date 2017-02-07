@@ -3522,7 +3522,7 @@ PRESTATE_RESULTS
 ORDERS
 	# NO orders; English F portugal destroyed
 POSTSTATE
-	France: F spa/sc
+	France: F por
 	France: F mao
 END
 
