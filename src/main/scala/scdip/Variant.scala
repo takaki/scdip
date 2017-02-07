@@ -67,12 +67,7 @@ case class Variant(name: String,
       Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
     }).toMap
 
-    MovementState(Phase.parse(startingTime).turn,
-      SupplyCenterInfo(home, owner),
-      UnitLocation(map),
-      powerMap,
-      worldMap,
-      victoryCondition)
+    MovementState(worldMap, Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(home, owner), powerMap, victoryCondition)
   }
 
 }
@@ -84,20 +79,20 @@ case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Provi
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   override def toString: String = locationUnitMap.map { case (l, gu) => s"$l[$gu]" }.mkString("; ")
 
-  def isEmpty(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
+  def isClear(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
 
-  def updated(unitState: UnitState): UnitLocation = copy(locationUnitMap.updated(unitState.location, unitState.gameUnit))
+  def updated(unitState: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitState.location, unitState.gameUnit))
 
   def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, gu) => l ~~ location })
 
   private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
 
-  def getUnits(locations: Seq[Location]): Seq[UnitState] = {
-    locations.flatMap(l => provinceMap.get(l.province)).map { case (loc, unit) => UnitState(loc, unit) }
+  def getUnits(locations: Seq[Location]): Seq[UnitPosition] = {
+    locations.flatMap(l => provinceMap.get(l.province)).map { case (loc, unit) => UnitPosition(loc, unit) }
   }
 
-  def unitStats: List[UnitState] = {
-    locationUnitMap.toList.map { case (l, g) => UnitState(l, g) }
+  def unitStats: List[UnitPosition] = {
+    locationUnitMap.toList.map { case (l, g) => UnitPosition(l, g) }
   }
 
   def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
@@ -110,10 +105,10 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   }
 }
 
-case class UnitState(location: Location, gameUnit: GameUnit) {
+case class UnitPosition(location: Location, gameUnit: GameUnit) {
   require(location.coast.isDefined)
 
-  override def toString: String = s"$gameUnit $location"
+  override def toString: String = s"${gameUnit.power}: $location ${gameUnit.unitType}"
 
 }
 

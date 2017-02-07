@@ -65,18 +65,18 @@ case class Datc(variant: Variant,
                 title: String,
                 phase: Phase,
                 supplyCenterOwner: Map[Province, Power],
-                preState: Seq[UnitState],
-                preStateDislodged: Seq[UnitState],
+                preState: Seq[UnitPosition],
+                preStateDislodged: Seq[UnitPosition],
                 preStateResult: Seq[OrderResult],
                 orders: Seq[Order],
-                postState: Seq[UnitState],
-                dislodged: Seq[UnitState]) extends Specification {
+                postState: Seq[UnitPosition],
+                dislodged: Seq[UnitPosition]) extends Specification {
 
   def runTest = {
     if (phase.phaseType == Movement && supplyCenterOwner.isEmpty && preStateDislodged.isEmpty && preStateResult.isEmpty) {
       val iniState = variant.movementState
       val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
-      val retreatState = testState.next(orders).asInstanceOf[RetreatState] // TODO: FIXME
+      val retreatState = testState.next(orders) // TODO: FIXME
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {

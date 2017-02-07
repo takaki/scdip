@@ -96,6 +96,8 @@ sealed trait OrderBase {
 
   def gameUnit: GameUnit = GameUnit(power, unitType)
 
+  def unitPosition: UnitPosition = UnitPosition(src, gameUnit)
+
 }
 
 sealed trait Order extends OrderBase

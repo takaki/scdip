@@ -43,7 +43,7 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
       }
   }
 
-  def prestateDislodged: Parser[List[UnitState]] = "PRESTATE_DISLODGED" ~> LF ~> rep(state)
+  def prestateDislodged: Parser[List[UnitPosition]] = "PRESTATE_DISLODGED" ~> LF ~> rep(state)
 
   def prestateResults: Parser[List[OrderResult]] = "PRESTATE_RESULTS" ~> LF ~> rep(result)
 
@@ -57,23 +57,23 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def casename: Parser[String] = "CASE" ~> ".+".r <~ LF ^^ { result => result }
 
-  def prestateSupplycenterOwners: Parser[List[UnitState]] = "PRESTATE_SUPPLYCENTER_OWNERS" ~> LF ~> rep(state)
+  def prestateSupplycenterOwners: Parser[List[UnitPosition]] = "PRESTATE_SUPPLYCENTER_OWNERS" ~> LF ~> rep(state)
 
   def prestateSetphase: Parser[Phase] = "PRESTATE_SETPHASE" ~> phase <~ LF
 
-  def prestate: Parser[List[UnitState]] = "PRESTATE" ~> LF ~> rep(state)
+  def prestate: Parser[List[UnitPosition]] = "PRESTATE" ~> LF ~> rep(state)
 
-  def state: Parser[UnitState] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitState(l.setCoast(u), GameUnit(p, u)) }
+  def state: Parser[UnitPosition] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitPosition(l.setCoast(u), GameUnit(p, u)) }
 
   def orders: Parser[List[Order]] = "ORDERS" ~> rep1(LF) ~> rep(order <~ LF)
 
-  def poststateBlock: Parser[(List[UnitState], List[UnitState])] = poststate ~ opt(poststateDislodged) ^^ { case (ps ~ pd) => (ps, pd.toList.flatten) }
+  def poststateBlock: Parser[(List[UnitPosition], List[UnitPosition])] = poststate ~ opt(poststateDislodged) ^^ { case (ps ~ pd) => (ps, pd.toList.flatten) }
 
-  def poststate: Parser[List[UnitState]] = "POSTSTATE" ~> rep1(LF) ~> rep(state) <~ opt(LF)
+  def poststate: Parser[List[UnitPosition]] = "POSTSTATE" ~> rep1(LF) ~> rep(state) <~ opt(LF)
 
-  def poststateDislodged: Parser[List[UnitState]] = "POSTSTATE_DISLODGED" ~> rep1(LF) ~> rep(state) <~ rep(LF)
+  def poststateDislodged: Parser[List[UnitPosition]] = "POSTSTATE_DISLODGED" ~> rep1(LF) ~> rep(state) <~ rep(LF)
 
-  def poststateSame: Parser[(List[UnitState], List[UnitState])] = "POSTSTATE_SAME" <~ LF ^^ { result => (List.empty[UnitState], List.empty[UnitState]) }
+  def poststateSame: Parser[(List[UnitPosition], List[UnitPosition])] = "POSTSTATE_SAME" <~ LF ^^ { result => (List.empty[UnitPosition], List.empty[UnitPosition]) }
 }
 
 trait OrderParser extends UnitTypeParser with RegexParsers {

@@ -341,17 +341,21 @@ object OrderState {
       }
     }
 
-    val dislodgedPairs = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
+    val dislodgedPairs: Seq[(MoveOrder, Order)] = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
       case (o: NonMoveOrder) if m.dst ~~ o.src => true
       case (o: MoveOrder) if !orderState.notMarked(o) && m.dst ~~ o.src => true
       case _ => false
     }.map(o => (m, o)))
-    val os2 = dislodgedPairs.foldLeft(orderState) {
-      case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
-        os.delCombatList(o).addDislodged(o, m)
-      case (os, (m, o)) => os.addDislodged(o, m)
+
+    def makeDislodged(orderState: OrderState, dp: Seq[(MoveOrder, Order)]): OrderState = {
+      dislodgedPairs.foldLeft(orderState) {
+        case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
+          os.delCombatList(o).addDislodged(o, m)
+        case (os, (m, o)) => os.addDislodged(o, m)
+      }
     }
-    dislodgedPairs.foldLeft(os2) {
+
+    dislodgedPairs.foldLeft(makeDislodged(orderState, dislodgedPairs)) {
       case (os, (m, _)) => unbounce(os, m.src.province)
     }
   }
@@ -468,6 +472,10 @@ object OrderState {
   }
 
   case class DislodgedList(_dislodged: Map[Order, MoveOrder] = Map.empty) {
+    def retreatAreas(worldMap: WorldMap, combatProvinces: Set[Province]) = _dislodged.toSeq.map {
+      case (o, m) => (o, worldMap.neighbours(o.src, combatProvinces + m.src.province))
+    }
+
     def provinces: Seq[Location] = _dislodged.keys.map(_.src).toSeq
 
     def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(_dislodged = _dislodged + (order -> moveOrder))
@@ -485,18 +493,51 @@ case class OrderResults(results: Seq[OrderResult],
                         convoySucceeded: ConvoySucceeded,
                         combatListRecord: CombatListRecord,
                         dislodgedList: DislodgedList) {
+  def doMove(_unitLocation: UnitLocation): UnitLocation = {
+    def afterDislodged(unitLocation: UnitLocation): UnitLocation = {
+      dislodgedList.provinces.foldLeft(unitLocation) { (u, l) => u.clear(l) }
+    }
 
+    def successResults: Seq[MoveOrder] = {
+      results.collect {
+        case (r: SuccessResult) => r.order
+      }.collect {
+        case (m: MoveOrder) => m
+      }
+    }
 
-  def retreatAreas(worldMap: WorldMap): Seq[(Order, Set[Location])] = dislodgedList._dislodged.toSeq.map {
-    case (o, m) => (o, worldMap.neighbours(o.src, combatListRecord.provinces.toSet + m.src.province))
+    @scala.annotation.tailrec
+    def move(unitLocation: UnitLocation, moves: Seq[MoveOrder]): UnitLocation = {
+      if (moves.isEmpty) {
+        unitLocation
+      } else {
+        val (s, f) = moves.partition(m => unitLocation.isClear(m.dst))
+        if (s.isEmpty && f.nonEmpty) {
+          // maybe circular
+          f.foldLeft(f.foldLeft(unitLocation) {
+            case (u, m) => u.clear(m.src)
+          }) {
+            case (u, m) => u.updated(UnitPosition(m.dst, m.gameUnit))
+          }
+        } else {
+          move(s.foldLeft(unitLocation) {
+            case (u, m) => u.clear(m.src).updated(UnitPosition(m.dst, m.gameUnit))
+          }, f)
+        }
+      }
+    }
+
+    move(afterDislodged(_unitLocation), successResults)
   }
 
-  def retreatLocations(worldMap: WorldMap): Seq[Location] = retreatAreas(worldMap).collect {
-    case (o, ls) if ls.nonEmpty => o.src
+  private def retreatAreas(worldMap: WorldMap): Seq[(Order, Set[Location])] = dislodgedList.retreatAreas(worldMap, combatListRecord.provinces.toSet)
+
+  def retreatUnitPositions(worldMap: WorldMap): Seq[UnitPosition] = retreatAreas(worldMap).collect {
+    case (o, ls) if ls.nonEmpty => o.unitPosition
   }
 
-  def disbandLocations(worldMap: WorldMap): Seq[Location] = retreatAreas(worldMap).collect {
-    case (o, ls) if ls.isEmpty => o.src
+  def disbandUnitPosittions(worldMap: WorldMap): Seq[UnitPosition] = retreatAreas(worldMap).collect {
+    case (o, ls) if ls.isEmpty => o.unitPosition
   }
 
 }
