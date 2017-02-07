@@ -2,8 +2,6 @@ package scdip
 
 trait GameState {
   def phaseType: PhaseType
-
-  def next(orders: Seq[Order]): GameState
 }
 
 case class MovementState(worldMap: WorldMap,
@@ -14,7 +12,7 @@ case class MovementState(worldMap: WorldMap,
                          victoryCondition: VictoryCondition) extends GameState {
   val phaseType = PhaseType.Movement
 
-  override def next(orders: Seq[Order]): RetreatState = {
+  def next(orders: Seq[Order]): RetreatState = {
     val orderResults = OrderState(unitLocation.filterOrders(orders, worldMap), worldMap).resolve
     RetreatState(worldMap, turn, orderResults.doMove(unitLocation), supplyCenterInfo, orderResults)
   }
@@ -30,7 +28,7 @@ case class RetreatState(worldMap: WorldMap, turn: Turn, unitLocation: UnitLocati
 
   val disbandUnits: Seq[UnitPosition] = orderResults.disbandUnitPosittions(worldMap)
 
-  override def next(orders: Seq[Order]): GameState = ???
+  def next(orders: Seq[RetreatOrder]): GameState = ???
 }
 
 case class AdjustmentState(turn: Turn,
@@ -38,7 +36,7 @@ case class AdjustmentState(turn: Turn,
                            unitLocation: UnitLocation) extends GameState {
   override val phaseType = PhaseType.Adjustment
 
-  override def next(orders: Seq[Order]): GameState = ???
+  def next(orders: Seq[AdjustmentOrder]): GameState = ???
 }
 
 object PhaseType {

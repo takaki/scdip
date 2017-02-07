@@ -472,8 +472,8 @@ object OrderState {
   }
 
   case class DislodgedList(_dislodged: Map[Order, MoveOrder] = Map.empty) {
-    def retreatAreas(worldMap: WorldMap, combatProvinces: Set[Province]) = _dislodged.toSeq.map {
-      case (o, m) => (o, worldMap.neighbours(o.src, combatProvinces + m.src.province))
+    def retreatAreas(worldMap: WorldMap, combatProvinces: Set[Province]): Seq[(UnitPosition, Set[Location])] = _dislodged.toSeq.map {
+      case (o, m) => (o.unitPosition, worldMap.neighbours(o.src, combatProvinces + m.src.province))
     }
 
     def provinces: Seq[Location] = _dislodged.keys.map(_.src).toSeq
@@ -530,14 +530,16 @@ case class OrderResults(results: Seq[OrderResult],
     move(afterDislodged(_unitLocation), successResults)
   }
 
-  private def retreatAreas(worldMap: WorldMap): Seq[(Order, Set[Location])] = dislodgedList.retreatAreas(worldMap, combatListRecord.provinces.toSet)
+  private def retreatAreas(worldMap: WorldMap): Seq[(UnitPosition, Set[Location])] = dislodgedList.retreatAreas(worldMap, combatListRecord.provinces.toSet)
+
+  def retreatArea(worldMap: WorldMap, unitPosition: UnitPosition): Set[Location] = retreatAreas(worldMap).find(_._1 == unitPosition).map(_._2).getOrElse(Set.empty)
 
   def retreatUnitPositions(worldMap: WorldMap): Seq[UnitPosition] = retreatAreas(worldMap).collect {
-    case (o, ls) if ls.nonEmpty => o.unitPosition
+    case (o, ls) if ls.nonEmpty => o
   }
 
   def disbandUnitPosittions(worldMap: WorldMap): Seq[UnitPosition] = retreatAreas(worldMap).collect {
-    case (o, ls) if ls.isEmpty => o.unitPosition
+    case (o, ls) if ls.isEmpty => o
   }
 
 }

@@ -108,11 +108,24 @@ sealed trait RetreatOrder extends OrderBase
 
 sealed trait AdjustmentOrder extends OrderBase
 
-object MovementOrder
+object RetreatOrder {
 
-object RetreatOrder
+  case class RetreatMoveOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {
+  }
 
-object AdjustmentOrder
+  case class DestroyOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {
+  }
+
+}
+
+object AdjustmentOrder {
+
+  case class BuildOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
+
+  case class DisbandOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
+
+}
+
 
 object UnitType {
 

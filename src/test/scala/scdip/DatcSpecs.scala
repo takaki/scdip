@@ -80,7 +80,11 @@ case class Datc(variant: Variant,
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
-      Seq(("NOT IMPLEMENTED", () => 1 === 2))
+      if (phase.phaseType == RetreatState) {
+
+      } else {
+        Seq(("NOT IMPLEMENTED", () => 1 === 2))
+      }
     }
   }
 
