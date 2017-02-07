@@ -703,29 +703,29 @@ case class OrderState(orders: Seq[Order],
 trait OrderResult {
   def power: Power = order.power
 
-  def order: OrderBase
+  def order: Order
 
   def gameUnit: GameUnit = GameUnit(power, order.unitType)
 
-  def run[T](f: OrderBase => T): Option[T]
+  def run[T](f: Order => T): Option[T]
 
-  def flatRun[T](f: OrderBase => Option[T]): Option[T]
+  def flatRun[T](f: Order => Option[T]): Option[T]
 
   def mark: Option[OrderMark]
 }
 
-case class SuccessResult(order: OrderBase) extends OrderResult {
-  override def run[T](f: (OrderBase) => T): Option[T] = Option(f(order))
+case class SuccessResult(order: Order) extends OrderResult {
+  override def run[T](f: (Order) => T): Option[T] = Option(f(order))
 
-  override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = f(order)
+  override def flatRun[T](f: (Order) => Option[T]): Option[T] = f(order)
 
   def mark = None
 }
 
-case class FailureResult(order: OrderBase, mark: Option[OrderMark] = None) extends OrderResult {
-  override def run[T](f: (OrderBase) => T): Option[T] = None
+case class FailureResult(order: Order, mark: Option[OrderMark] = None) extends OrderResult {
+  override def run[T](f: (Order) => T): Option[T] = None
 
-  override def flatRun[T](f: (OrderBase) => Option[T]): Option[T] = None
+  override def flatRun[T](f: (Order) => Option[T]): Option[T] = None
 }
 
 object OrderMark {

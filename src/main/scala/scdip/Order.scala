@@ -1,5 +1,30 @@
 package scdip
 
+sealed trait Order {
+  def power: Power
+
+  def unitType: UnitType
+
+  def src: Location
+
+  def success = SuccessResult(this)
+
+  def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
+
+  def gameUnit: GameUnit = GameUnit(power, unitType)
+
+  def unitPosition: UnitPosition = UnitPosition(src, gameUnit)
+
+}
+
+sealed trait MovementOrder extends Order
+
+sealed trait NonMoveOrder extends MovementOrder
+
+sealed trait RetreatOrder extends Order
+
+sealed trait AdjustmentOrder extends Order
+
 
 object Order {
 
@@ -76,53 +101,14 @@ object Order {
 
   }
 
-  case class BuildOrder(power: Power, unitType: UnitType, src: Location) extends Order
 
-  case class RemoveOrder(power: Power, unitType: UnitType, src: Location) extends Order
+  case class RetreatMoveOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {}
 
-}
-
-
-sealed trait OrderBase {
-  def power: Power
-
-  def unitType: UnitType
-
-  def src: Location
-
-  def success = SuccessResult(this)
-
-  def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
-
-  def gameUnit: GameUnit = GameUnit(power, unitType)
-
-  def unitPosition: UnitPosition = UnitPosition(src, gameUnit)
-
-}
-
-sealed trait Order extends OrderBase
-
-sealed trait NonMoveOrder extends Order
-
-sealed trait RetreatOrder extends OrderBase
-
-sealed trait AdjustmentOrder extends OrderBase
-
-object RetreatOrder {
-
-  case class RetreatMoveOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {
-  }
-
-  case class DestroyOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {
-  }
-
-}
-
-object AdjustmentOrder {
+  case class DestroyOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {}
 
   case class BuildOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
 
-  case class DisbandOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
+  case class RemoveOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
 
 }
 

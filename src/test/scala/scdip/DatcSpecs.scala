@@ -4,7 +4,7 @@ import org.junit.runner.RunWith
 import org.specs2.mutable.Specification
 import org.specs2.runner.JUnitRunner
 import org.specs2.specification.core.Fragments
-import scdip.PhaseType.Movement
+import scdip.PhaseType.{Movement, Retreat}
 
 import scala.io.Source
 import scala.xml.XML
@@ -36,8 +36,8 @@ class DatcSpecs extends Specification {
       "6.B.14" // TODO: adjustment
     ).contains(p.title))
     val st = 0
-    val sep = st + 0
-    val end = st + 130
+    val sep = st + 132
+    val end = st + 150
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>
         s"${i + sep} ${d.title}" >> {
@@ -76,12 +76,16 @@ case class Datc(variant: Variant,
     if (phase.phaseType == Movement && supplyCenterOwner.isEmpty && preStateDislodged.isEmpty && preStateResult.isEmpty) {
       val iniState = variant.movementState
       val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
-      val retreatState = testState.next(orders) // TODO: FIXME
+      val retreatState = testState.next(orders)
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
-      if (phase.phaseType == RetreatState) {
-
+      if (phase.phaseType == Retreat) {
+        val iniState = variant.movementState
+        val movement = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
+        val retreat = movement.next(preStateResult.map(_.order))
+        val nextState = retreat.next(orders)
+        Seq(("POSTSTATE", () => nextState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)))
       } else {
         Seq(("NOT IMPLEMENTED", () => 1 === 2))
       }

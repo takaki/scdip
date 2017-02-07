@@ -53,7 +53,7 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def success: Parser[SuccessResult.type] = "SUCCESS" ^^ { _ => SuccessResult }
 
-  def failure: Parser[(OrderBase) => FailureResult] = "FAILURE" ^^ { _ => FailureResult(_: OrderBase, None) }
+  def failure: Parser[(Order) => FailureResult] = "FAILURE" ^^ { _ => FailureResult(_: Order, None) }
 
   def casename: Parser[String] = "CASE" ~> ".+".r <~ LF ^^ { result => result }
 

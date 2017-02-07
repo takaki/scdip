@@ -67,7 +67,7 @@ case class Variant(name: String,
       Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
     }).toMap
 
-    MovementState(worldMap, Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(home, owner), powerMap, victoryCondition)
+    MovementState(WorldInfo(worldMap, victoryCondition), Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(home, owner))
   }
 
 }
