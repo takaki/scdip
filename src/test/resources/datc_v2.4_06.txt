@@ -3501,10 +3501,10 @@ ORDERS
 	France: A bur-bel		# will disband
 POSTSTATE
 	England: F ech
-	France: A par
+	France: A pic
 	France: A bre
 	Germany: A mun
-	Germany: A mar
+	Germany: A bur
 END
 
 
