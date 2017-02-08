@@ -35,9 +35,9 @@ class DatcSpecs extends Specification {
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
       "6.B.14" // TODO: adjustment
     ).contains(p.title))
-    val st = 130
-    val sep = st + 9
-    val end = st + 16
+    val st = 146
+    val sep = st + 1
+    val end = st + 17
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>
         s"${i + sep} ${d.title}" >> {
@@ -75,20 +75,26 @@ case class Datc(variant: Variant,
   def runTest = {
     if (phase.phaseType == Movement && supplyCenterOwner.isEmpty && preStateDislodged.isEmpty && preStateResult.isEmpty) {
       val iniState = variant.movementState
-      val testState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
-      val retreatState = testState.next(orders)
+      val movementState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
+      val retreatState = movementState.next(orders)
       Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
       if (phase.phaseType == Retreat) {
         val iniState = variant.movementState
         val movementOrders = preStateResult.map(_.order)
-        val movement = iniState.copy(turn = phase.turn, unitLocation = movementOrders.foldLeft(iniState.unitLocation)((ul, mo) => ul.updated(mo.unitPosition)))
-        val retreat = movement.next(preStateResult.map(_.order))
-        val nextState = retreat.next(orders)
+        val movementState = iniState.copy(turn = phase.turn, unitLocation = movementOrders.foldLeft(iniState.unitLocation)((ul, mo) => ul.updated(mo.unitPosition)))
+        val retreatState = movementState.next(preStateResult.map(_.order))
+        val nextState = retreatState.next(orders)
         Seq(("POSTSTATE", () => nextState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
       } else {
-        Seq(("NOT IMPLEMENTED", () => 1 === 2))
+        val iniState = variant.movementState
+        val adjustmentState = AdjustmentState(iniState.worldInfo,
+          phase.turn,
+          preState.foldLeft(iniState.unitLocation)((ul, up) => ul.updated(up)),
+          supplyCenterOwner.foldLeft(iniState.supplyCenterInfo) { case (sc, (pr, pw)) => sc.updated(pr, pw) })
+        val movementState= adjustmentState.next(orders)
+        Seq(("POSTSTATE", () => movementState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
       }
     }
   }

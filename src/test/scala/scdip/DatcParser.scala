@@ -104,7 +104,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
     case (t ~ s ~ u ~ f ~ to) => ConvoyOrder(_: Power, t, s.setCoast(t), u, f, to)
   }
 
-  def buildOrder: Parser[(Power) => BuildOrder] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildOrder(_: Power, ut, l) }
+  def buildOrder: Parser[(Power) => BuildOrder] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildOrder(_: Power, ut, l.setCoast(ut)) }
 
   def removeOrder(): Parser[(Power) => RemoveOrder] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveOrder(_: Power, ut, l) }
 

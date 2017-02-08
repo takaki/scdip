@@ -351,6 +351,7 @@ object OrderState {
       dislodgedPairs.foldLeft(orderState) {
         case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
           os.delCombatList(o).addDislodged(o, m)
+        case (os, (m, o)) if os.isConvoyTarget(m) => os.addDislodged(o)
         case (os, (m, o)) => os.addDislodged(o, m)
       }
     }
@@ -471,14 +472,16 @@ object OrderState {
     def isConvoySuccess(m: MoveOrder): Boolean = _convoySucceeded.contains(m)
   }
 
-  case class DislodgedList(_dislodged: Map[Order, MoveOrder] = Map.empty) {
+  case class DislodgedList(_dislodged: Map[Order, Option[MoveOrder]] = Map.empty) {
     def retreatAreas(worldMap: WorldMap, combatProvinces: Set[Province]): Seq[(UnitPosition, Set[Location])] = _dislodged.toSeq.map {
-      case (o, m) => (o.unitPosition, worldMap.neighbours(o.src, combatProvinces + m.src.province))
+      case (o, m) => (o.unitPosition, worldMap.neighbours(o.src, m.fold(combatProvinces)(m => combatProvinces + m.src.province)))
     }
 
     def provinces: Seq[Location] = _dislodged.keys.map(_.src).toSeq
 
-    def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(_dislodged = _dislodged + (order -> moveOrder))
+    def add(order: Order, moveOrder: MoveOrder): DislodgedList = copy(_dislodged = _dislodged + (order -> Option(moveOrder)))
+
+    def addOnly(order: Order): DislodgedList = copy(_dislodged = _dislodged + (order -> None))
 
     def del(order: Order): DislodgedList = copy(_dislodged = _dislodged - order)
 
@@ -552,6 +555,8 @@ case class OrderState(orders: Seq[Order],
                       _convoySucceeded: ConvoySucceeded = ConvoySucceeded(),
                       _combatListRecord: CombatListRecord = CombatListRecord(),
                       _dislodgedList: DislodgedList = DislodgedList()) {
+
+
   lazy val orderGraph: Graph[Order, DiEdge] = Graph.from(edges = {
     (for {
       x <- orders
@@ -632,6 +637,7 @@ case class OrderState(orders: Seq[Order],
       case (sc, _) => sc
     }._2
     if (mos.size == 1) Option(mos.head._1) else None
+    // TODO: case (x,List(_) => x) ???
   }
 
   def highestSupportCount(province: Province): Int = {
@@ -694,6 +700,8 @@ case class OrderState(orders: Seq[Order],
 
   // dislodged list
   def addDislodged(order: Order, moveOrder: MoveOrder): OrderState = copy(_dislodgedList = _dislodgedList.add(order, moveOrder))
+
+  def addDislodged(o: Order): OrderState = copy(_dislodgedList = _dislodgedList.addOnly(o))
 
   def delDislodged(order: Order): OrderState = copy(_dislodgedList = _dislodgedList.del(order))
 

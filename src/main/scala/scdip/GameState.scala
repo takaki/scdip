@@ -1,6 +1,6 @@
 package scdip
 
-import scdip.Order.MoveOrder
+import scdip.Order.{BuildOrder, MoveOrder}
 import scdip.Season.{Fall, Spring}
 
 trait GameState {
@@ -71,7 +71,16 @@ case class AdjustmentState(worldInfo: WorldInfo,
                            supplyCenterInfo: SupplyCenterInfo) extends GameState {
   override val phaseType = PhaseType.Adjustment
 
-  def next(orders: Seq[Order]): MovementState = ???
+  def next(orders: Seq[Order]): MovementState = {
+    val newSCI = unitLocation.unitStats.foldLeft(supplyCenterInfo) {
+      case (sc, up) => sc.updated(up.location.province, up.gameUnit.power)
+    }
+    val newUL = orders.foldLeft(unitLocation) {
+      case (ul, o: BuildOrder) => ul.updated(o.unitPosition)
+      case (ul, _) => ul
+    }
+    MovementState(worldInfo, turn.next, newUL, newSCI)
+  }
 }
 
 object PhaseType {

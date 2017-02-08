@@ -74,14 +74,22 @@ case class Variant(name: String,
 
 case class VictoryCondition(winningSupplyCenters: Int, yearsWithoutScCapture: Int, gameLength: Int)
 
-case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Province, Option[Power]])
+case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Province, Option[Power]]) {
+  def updated(province: Province, power: Power): SupplyCenterInfo = {
+    if (home.contains(province)) {
+      copy(owner = owner.updated(province, Option(power)))
+    } else {
+      this
+    }
+  }
+}
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   override def toString: String = locationUnitMap.map { case (l, gu) => s"$l[$gu]" }.mkString("; ")
 
   def isClear(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
 
-  def updated(unitState: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitState.location, unitState.gameUnit))
+  def updated(unitPosition: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitPosition.location, unitPosition.gameUnit))
 
   def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, gu) => l ~~ location })
 
