@@ -76,6 +76,8 @@ case class VictoryCondition(winningSupplyCenters: Int, yearsWithoutScCapture: In
 
 case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Province, Option[Power]]) {
 
+  def isOwner(province: Province, power: Power): Boolean = owner.get(province).flatten.contains(power)
+
   def isHome(province: Province, power: Power): Boolean = home.get(province).flatten.contains(power)
 
   def count(power: Power): Int = owner.values.count(_.contains(power))
