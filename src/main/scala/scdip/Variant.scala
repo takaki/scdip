@@ -92,6 +92,7 @@ case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Provi
 }
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
+
   def count(power: Power): Int = locationUnitMap.values.count(_.power == power)
 
   override def toString: String = locationUnitMap.map { case (l, gu) => s"$l[$gu]" }.mkString("; ")

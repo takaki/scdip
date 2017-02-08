@@ -1,6 +1,6 @@
 package scdip
 
-import scdip.Order.{BuildOrder, MoveOrder}
+import scdip.Order.{BuildOrder, MoveOrder, RemoveOrder}
 import scdip.Season.{Fall, Spring}
 
 trait GameState {
@@ -81,6 +81,8 @@ case class AdjustmentState(worldInfo: WorldInfo,
         ul.isClear(o.src) && worldInfo.worldMap.exists(o.src) &&
         newSCI.isOwner(o.src.province, o.power)
       => ul.updated(o.unitPosition)
+      case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power)
+      => ul.clear(o.src)
       case (ul, _) => ul
     }
     MovementState(worldInfo, turn.next, newUL, newSCI)
