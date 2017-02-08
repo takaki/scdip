@@ -92,6 +92,8 @@ case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Provi
 }
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
+  def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.gameUnit.power }
+
 
   def count(power: Power): Int = locationUnitMap.values.count(_.power == power)
 

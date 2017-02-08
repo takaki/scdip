@@ -81,7 +81,8 @@ case class AdjustmentState(worldInfo: WorldInfo,
         ul.isClear(o.src) && worldInfo.worldMap.exists(o.src) &&
         newSCI.isOwner(o.src.province, o.power)
       => ul.updated(o.unitPosition)
-      case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power)
+      case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power) &&
+        ul.exists(o.unitPosition)
       => ul.clear(o.src)
       case (ul, _) => ul
     }

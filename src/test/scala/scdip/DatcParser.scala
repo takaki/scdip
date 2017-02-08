@@ -106,7 +106,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def buildOrder: Parser[(Power) => BuildOrder] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildOrder(_: Power, ut, l.setCoast(ut)) }
 
-  def removeOrder(): Parser[(Power) => RemoveOrder] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveOrder(_: Power, ut, l) }
+  def removeOrder(): Parser[(Power) => RemoveOrder] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveOrder(_: Power, ut, l.setCoast(ut)) }
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
