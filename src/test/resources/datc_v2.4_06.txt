@@ -3577,6 +3577,7 @@ PRESTATE_SUPPLYCENTER_OWNERS
 PRESTATE
 	Russia: A war
 	Germany: A par
+	Germany: A ruh
 ORDERS
 	Germany: Build A war 		# not owned, not a Homse SC, and has a unit there!
 	Germany: Build A kiel		# this should succeed
@@ -3585,6 +3586,7 @@ POSTSTATE
 	Russia: A war
 	Germany: A par
 	Germany: A kie
+	Germany: A ruh
 END
 
 
