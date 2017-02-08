@@ -217,6 +217,8 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   def neighbours(origin: Location, ngProvinces: Set[Province] = Set.empty): Set[Location] = {
     diEdges.filter(e => e.from == origin && !ngProvinces.contains(e.to.province)).map(e => e.to).toSet
   }
+
+  def exists(location: Location): Boolean = graph.nodes.contains(location)
 }
 
 object WorldMap {

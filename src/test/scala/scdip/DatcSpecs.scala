@@ -92,7 +92,7 @@ case class Datc(variant: Variant,
         val adjustmentState = AdjustmentState(iniState.worldInfo,
           phase.turn,
           preState.foldLeft(iniState.unitLocation)((ul, up) => ul.updated(up)),
-          supplyCenterOwner.foldLeft(iniState.supplyCenterInfo) { case (sc, (pr, pw)) => sc.updated(pr, pw) })
+          supplyCenterOwner.foldLeft(iniState.supplyCenterInfo.copy(owner = Map.empty)) { case (sc, (pr, pw)) => sc.updated(pr, pw) })
         val movementState= adjustmentState.next(orders)
         Seq(("POSTSTATE", () => movementState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
       }

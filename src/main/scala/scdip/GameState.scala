@@ -76,7 +76,10 @@ case class AdjustmentState(worldInfo: WorldInfo,
       case (sc, up) => sc.updated(up.location.province, up.gameUnit.power)
     }
     val newUL = orders.foldLeft(unitLocation) {
-      case (ul, o: BuildOrder) => ul.updated(o.unitPosition)
+      case (ul, o: BuildOrder) if ul.count(o.power) < newSCI.count(o.power) &&
+        newSCI.isHome(o.src.province, o.power) &&
+        ul.isClear(o.src) && worldInfo.worldMap.exists(o.src)
+      => ul.updated(o.unitPosition)
       case (ul, _) => ul
     }
     MovementState(worldInfo, turn.next, newUL, newSCI)
