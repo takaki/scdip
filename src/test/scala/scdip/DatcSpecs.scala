@@ -36,7 +36,7 @@ class DatcSpecs extends Specification {
       "6.B.14" // TODO: adjustment
     ).contains(p.title))
     val st = 146
-    val sep = st + 8
+    val sep = st + 10
     val end = st + 23
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>

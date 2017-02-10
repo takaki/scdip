@@ -59,32 +59,41 @@ case class Variant(name: String,
   def power(name: String): Power = powerMap(name)
 
   def movementState: MovementState = {
-    val home = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._2 == "none") None else Option(power(d._2)))).toMap
-    val owner = supplyCenterInfo.map(d => worldMap.province(d._1) -> (if (d._3 == "none") None else Option(power(d._3)))).toMap
+    val provinces: Set[Province] = supplyCenterInfo.map { case (province, homepower, _) => worldMap.province(province) }.toSet
+    val home = supplyCenterInfo.collect { case (province, homepower, _) if homepower != "none" =>
+      worldMap.province(province) -> power(homepower)
+    }.toMap
+    val owner = supplyCenterInfo.collect { case (province, _, owner) if owner != "none" =>
+      worldMap.province(province) -> power(owner)
+    }.toMap
+
     val map = initialState.map(d => {
       val unitType = UnitType.parse(d._3)
       val coast: Option[Coast] = if (d._4.isEmpty) Option(unitType.defaultCoast) else Coast.parse(d._4)
       Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
     }).toMap
 
-    MovementState(WorldInfo(worldMap, victoryCondition), Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(home, owner))
+    MovementState(WorldInfo(worldMap, powerMap.values.toSeq, victoryCondition), Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(provinces, home, owner))
   }
 
 }
 
 case class VictoryCondition(winningSupplyCenters: Int, yearsWithoutScCapture: Int, gameLength: Int)
 
-case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Province, Option[Power]]) {
+case class SupplyCenterInfo(provinces: Set[Province], home: Map[Province, Power], owner: Map[Province, Power]) {
 
-  def isOwner(province: Province, power: Power): Boolean = owner.get(province).flatten.contains(power)
 
-  def isHome(province: Province, power: Power): Boolean = home.get(province).flatten.contains(power)
+  def ownHomes(power: Power): Set[Province] = home.collect { case (pr, pw) if pw == power => pr }.toSet & owner.collect { case (pr, pw) if pw == power => pr }.toSet
 
-  def count(power: Power): Int = owner.values.count(_.contains(power))
+  def isOwner(province: Province, power: Power): Boolean = owner.get(province).contains(power)
+
+  def isHome(province: Province, power: Power): Boolean = home.get(province).contains(power)
+
+  def count(power: Power): Int = owner.values.count(_ == power)
 
   def updated(province: Province, power: Power): SupplyCenterInfo = {
     if (home.contains(province)) {
-      copy(owner = owner.updated(province, Option(power)))
+      copy(owner = owner.updated(province, power))
     } else {
       this
     }
@@ -92,6 +101,10 @@ case class SupplyCenterInfo(home: Map[Province, Option[Power]], owner: Map[Provi
 }
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
+  def ownUnits(power: Power): Seq[UnitPosition] = {
+    locationUnitMap.filter { case (l, g) => g.power == power }.map { case (l, g) => UnitPosition(l, g) }.toSeq
+  }
+
   def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.gameUnit.power }
 
 

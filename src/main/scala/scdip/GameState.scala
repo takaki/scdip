@@ -2,6 +2,7 @@ package scdip
 
 import scdip.Order.{BuildOrder, MoveOrder, RemoveOrder}
 import scdip.Season.{Fall, Spring}
+import scdip.UnitType.{Army, Fleet}
 
 trait GameState {
   def phaseType: PhaseType
@@ -11,7 +12,7 @@ trait GameState {
   def next(orders: Seq[Order]): GameState
 }
 
-case class WorldInfo(worldMap: WorldMap, victoryCondition: VictoryCondition)
+case class WorldInfo(worldMap: WorldMap, powers: Seq[Power], victoryCondition: VictoryCondition)
 
 case class MovementState(worldInfo: WorldInfo,
                          turn: Turn,
@@ -86,7 +87,23 @@ case class AdjustmentState(worldInfo: WorldInfo,
       => ul.clear(o.src)
       case (ul, _) => ul
     }
-    MovementState(worldInfo, turn.next, newUL, newSCI)
+
+    @scala.annotation.tailrec
+    def civilDisorder(power: Power, unitLocation: UnitLocation, supplyCenterInfo: SupplyCenterInfo): UnitLocation = {
+      if (unitLocation.count(power) <= supplyCenterInfo.count(power)) {
+        unitLocation
+      } else {
+        val rm = unitLocation.ownUnits(power).sortBy { up =>
+          (up.gameUnit.unitType match {
+            case Fleet => 0
+            case Army => 1
+          }, -supplyCenterInfo.ownHomes(power).map(p => worldInfo.worldMap.distance(Location(p, Option(Coast.Land)), up.location)).min)
+        }.head
+        civilDisorder(power, unitLocation.clear(rm.location), supplyCenterInfo)
+      }
+    }
+
+    MovementState(worldInfo, turn.next, worldInfo.powers.foldLeft(newUL) { case (ul, p) => civilDisorder(p, ul, newSCI) }, newSCI)
   }
 }
 

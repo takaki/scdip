@@ -107,6 +107,7 @@ case class Location(province: Province, coast: Option[Coast]) {
       case Fleet => coast.fold(worldMap.connected(src.setCoast(t), this.province).getOrElse(this))(_ => this)
     }
   }
+
 }
 
 
@@ -216,6 +217,14 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   def neighbours(origin: Location, ngProvinces: Set[Province] = Set.empty): Set[Location] = {
     diEdges.filter(e => e.from == origin && !ngProvinces.contains(e.to.province)).map(e => e.to).toSet
+  }
+
+  def distance(from: Location, to:Location): Int = {
+    (for {
+      f<- graph.find(from)
+      t<- graph.find(to)
+      path <- f.shortestPathTo(t)
+    } yield path.nodes.size).getOrElse(10000)
   }
 
   def exists(location: Location): Boolean = graph.nodes.contains(location)
