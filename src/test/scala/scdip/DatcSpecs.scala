@@ -33,11 +33,19 @@ class DatcSpecs extends Specification {
     val parsers = DatcParser(variant)
 
     val datcs = parsers.parse(txt).right.get.filterNot(p => Set(
-      "6.B.14" // TODO: adjustment
+      // ignore Civil Disorder
+      "6.J.5",
+      "6.J.6",
+      "6.J.7",
+      "6.J.8",
+      "6.J.9.part1",
+      "6.J.9.part2",
+      "6.J.10",
+      "6.J.11"
     ).contains(p.title))
-    val st = 146
-    val sep = st + 10
-    val end = st + 23
+    val st = 0
+    val sep = st + 0
+    val end = st + 200
     "2nd" >> {
       Fragments.foreach(datcs.slice(sep, end).zipWithIndex) { case (d, i) =>
         s"${i + sep} ${d.title}" >> {
@@ -93,7 +101,7 @@ case class Datc(variant: Variant,
           phase.turn,
           preState.foldLeft(iniState.unitLocation)((ul, up) => ul.updated(up)),
           supplyCenterOwner.foldLeft(iniState.supplyCenterInfo.copy(owner = Map.empty)) { case (sc, (pr, pw)) => sc.updated(pr, pw) })
-        val movementState= adjustmentState.next(orders)
+        val movementState = adjustmentState.next(orders)
         Seq(("POSTSTATE", () => movementState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
       }
     }

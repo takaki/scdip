@@ -141,7 +141,7 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 case class UnitPosition(location: Location, gameUnit: GameUnit) {
   require(location.coast.isDefined)
 
-  override def toString: String = s"${gameUnit.power}: $location ${gameUnit.unitType}"
+  override def toString: String = s"${gameUnit.power}: ${gameUnit.unitType} $location "
 
 }
 

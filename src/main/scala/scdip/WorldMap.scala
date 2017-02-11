@@ -116,6 +116,10 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   private val diEdges = edges.map(e => DiEdge(e._1, e._2))
   private val graph: Graph[Location, DiEdge] = Graph.from(edges = diEdges)
+  private val distanceGraph: Graph[Location, DiEdge] = graph ++ (for {
+    f <- graph.nodes
+    t <- graph.nodes if f.value ~~ t.value && f != t
+  } yield DiEdge(f.value, t.value)).toList
   private val provinces = diEdges.map(de => de.from.province).distinct
 
   private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.exists(_.isLand)).map(de => de.from.province).toSet
@@ -219,10 +223,10 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
     diEdges.filter(e => e.from == origin && !ngProvinces.contains(e.to.province)).map(e => e.to).toSet
   }
 
-  def distance(from: Location, to:Location): Int = {
+  def distance(from: Location, to: Location): Int = {
     (for {
-      f<- graph.find(from)
-      t<- graph.find(to)
+      f <- distanceGraph.find(from)
+      t <- distanceGraph.find(to)
       path <- f.shortestPathTo(t)
     } yield path.nodes.size).getOrElse(10000)
   }
