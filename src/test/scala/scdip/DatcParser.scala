@@ -81,32 +81,34 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   val worldMap: WorldMap = variant.worldMap
 
-  def order: Parser[Order] = power ~ (holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder) ^^ { case (p ~ o) => o(p) }
+  def order: Parser[Order] = holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder
 
-  def holdOrder: Parser[(Power) => HoldOrder] = unittype ~ location <~ ("(?i)HOLD".r | "H") ^^ { case (t ~ s) => HoldOrder(_: Power, t, s.setCoast(t)) }
+  def unitPosition: Parser[UnitPosition] = power ~ unittype ~ location ^^ { case (p ~ u ~ l) => UnitPosition(l.setCoast(u), GameUnit(p, u)) }
 
-  def moveOrder: Parser[(Power) => MoveOrder] = unittype ~ (location <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (t ~ s ~ d ~ c) => MoveOrder(_: Power, t, s.setCoast(t), d.setDstCoast(t, s, worldMap), c.fold(false)(_ => true))
+  def holdOrder: Parser[HoldOrder] = unitPosition <~ ("(?i)HOLD".r | "H") ^^ { case (u) => HoldOrder(u) }
+
+  def moveOrder: Parser[MoveOrder] = (unitPosition <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
+    case (up ~ d ~ c) => MoveOrder(up, d.setDstCoast(up.gameUnit.unitType, up.location, worldMap), c.fold(false)(_ => true))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"
 
-  def supportHoldOrder: Parser[(Power) => SupportHoldOrder] = unittype ~ (location <~ support) ~ unittype ~ location ^^ {
-    case (t ~ s ~ ht ~ hs) => SupportHoldOrder(_: Power, t, s.setCoast(t), ht, hs.setCoast(ht))
+  def supportHoldOrder: Parser[SupportHoldOrder] = (unitPosition <~ support) ~ unittype ~ location ^^ {
+    case (up ~ ht ~ hs) => SupportHoldOrder(up, ht, hs.setCoast(ht))
   }
 
-  def supportMoveOrder: Parser[(Power) => SupportMoveOrder] = unittype ~ (location <~ support) ~ unittype ~ (location <~ "-") ~ location ^^ {
-    case (t ~ s ~ u ~ f ~ to) => SupportMoveOrder(_: Power, t, s.setCoast(t), u, f, to)
+  def supportMoveOrder: Parser[SupportMoveOrder] = (unitPosition <~ support) ~ unittype ~ (location <~ "-") ~ location ^^ {
+    case (up ~ u ~ f ~ to) => SupportMoveOrder(up, u, f, to)
   }
 
   // TODO: via convoy?
-  def convoyOrder: Parser[(Power) => ConvoyOrder] = unittype ~ (location <~ ("(?i)convoys".r | "C" | "c")) ~ unittype ~ (location <~ "-") ~ location ^^ {
-    case (t ~ s ~ u ~ f ~ to) => ConvoyOrder(_: Power, t, s.setCoast(t), u, f, to)
+  def convoyOrder: Parser[ConvoyOrder] = (unitPosition <~ ("(?i)convoys".r | "C" | "c")) ~ unittype ~ (location <~ "-") ~ location ^^ {
+    case (up ~ u ~ f ~ to) => ConvoyOrder(up, u, f, to)
   }
 
-  def buildOrder: Parser[(Power) => BuildOrder] = ("Build" ~> unittype) ~ location ^^ { case (ut ~ l) => BuildOrder(_: Power, ut, l.setCoast(ut)) }
+  def buildOrder: Parser[BuildOrder] = power ~ ("Build" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => BuildOrder(UnitPosition(l.setCoast(ut), GameUnit(p, ut))) }
 
-  def removeOrder(): Parser[(Power) => RemoveOrder] = ("Remove" ~> unittype) ~ location ^^ { case (ut ~ l) => RemoveOrder(_: Power, ut, l.setCoast(ut)) }
+  def removeOrder(): Parser[RemoveOrder] = power ~ ("Remove" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => RemoveOrder(UnitPosition(l.setCoast(ut), GameUnit(p, ut))) }
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 

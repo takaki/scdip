@@ -132,7 +132,7 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
     orders.collect {
       case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src == l && o.gameUnit == gu } => o
       case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } && o.unitType == Fleet =>
-        locationUnitMap.find { case (l, gu) => o.src ~~ l && o.gameUnit == gu }.fold(o) { case (l, gu) => o.copy(src = l, dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
+        locationUnitMap.find { case (l, gu) => o.src ~~ l && o.gameUnit == gu }.fold(o) { case (l, gu) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
       case (o: NonMoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } => o
     }
   }

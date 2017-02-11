@@ -1,19 +1,19 @@
 package scdip
 
 sealed trait Order {
-  def power: Power
+  def unitPosition: UnitPosition
 
-  def unitType: UnitType
+  def gameUnit: GameUnit = unitPosition.gameUnit
 
-  def src: Location
+  def power: Power = gameUnit.power
+
+  def unitType: UnitType = gameUnit.unitType
+
+  def src: Location = unitPosition.location
 
   def success = SuccessResult(this)
 
   def failure(orderMark: OrderMark) = FailureResult(this, Option(orderMark))
-
-  def gameUnit: GameUnit = GameUnit(power, unitType)
-
-  def unitPosition: UnitPosition = UnitPosition(src, gameUnit)
 
 }
 
@@ -28,11 +28,11 @@ sealed trait AdjustmentOrder extends Order
 
 object Order {
 
-  case class HoldOrder(power: Power, unitType: UnitType, src: Location) extends NonMoveOrder {
+  case class HoldOrder(unitPosition: UnitPosition) extends NonMoveOrder {
     override def toString: String = s"$power: $unitType $src H"
   }
 
-  case class MoveOrder(power: Power, unitType: UnitType, src: Location, dst: Location, explictConvoy: Boolean = false) extends Order {
+  case class MoveOrder(unitPosition: UnitPosition, dst: Location, explictConvoy: Boolean = false) extends Order {
 
 
     override def toString: String = s"$power: $unitType $src - $dst${if (explictConvoy) " via Convoy" else ""}"
@@ -57,7 +57,7 @@ object Order {
 
   }
 
-  case class SupportHoldOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, targetSrc: Location) extends SupportOrder {
+  case class SupportHoldOrder(unitPosition: UnitPosition, targetUnit: UnitType, targetSrc: Location) extends SupportOrder {
     override def toString: String = s"$power: $unitType $src S $targetUnit $targetSrc"
 
     override def canSupport(o: Order): Boolean = o match {
@@ -73,7 +73,7 @@ object Order {
 
   }
 
-  case class SupportMoveOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends SupportOrder {
+  case class SupportMoveOrder(unitPosition: UnitPosition, targetUnit: UnitType, from: Location, to: Location) extends SupportOrder {
     override def toString: String = s"$power: $unitType $src S $targetUnit $from - $to"
 
     override def canSupport(o: Order): Boolean = o match {
@@ -92,7 +92,7 @@ object Order {
 
   }
 
-  case class ConvoyOrder(power: Power, unitType: UnitType, src: Location, targetUnit: UnitType, from: Location, to: Location) extends NonMoveOrder {
+  case class ConvoyOrder(unitPosition: UnitPosition, targetUnit: UnitType, from: Location, to: Location) extends NonMoveOrder {
     override def toString: String = s"$power: $unitType $src C $targetUnit $from - $to"
 
     def findConvoyTarget(moves: Seq[MoveOrder]): Option[MoveOrder] = {
@@ -102,13 +102,13 @@ object Order {
   }
 
 
-  case class RetreatMoveOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {}
+  case class RetreatMoveOrder(unitPosition: UnitPosition) extends RetreatOrder {}
 
-  case class DestroyOrder(power: Power, unitType: UnitType, src: Location) extends RetreatOrder {}
+  case class DestroyOrder(unitPosition: UnitPosition) extends RetreatOrder {}
 
-  case class BuildOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
+  case class BuildOrder(unitPosition: UnitPosition) extends AdjustmentOrder
 
-  case class RemoveOrder(power: Power, unitType: UnitType, src: Location) extends AdjustmentOrder
+  case class RemoveOrder(unitPosition: UnitPosition) extends AdjustmentOrder
 
 }
 
