@@ -70,7 +70,8 @@ case class Variant(name: String,
     val map = initialState.map(d => {
       val unitType = UnitType.parse(d._3)
       val coast: Option[Coast] = if (d._4.isEmpty) Option(unitType.defaultCoast) else Coast.parse(d._4)
-      Location(worldMap.province(d._1), coast) -> GameUnit(power(d._2), unitType)
+      val location = Location(worldMap.province(d._1), coast)
+      location -> UnitPosition(power(d._2), unitType, location)
     }).toMap
 
     MovementState(WorldInfo(worldMap, powerMap.values.toSeq, victoryCondition), Phase.parse(startingTime).turn, UnitLocation(map), SupplyCenterInfo(provinces, home, owner))
@@ -100,7 +101,7 @@ case class SupplyCenterInfo(provinces: Set[Province], home: Map[Province, Power]
   }
 }
 
-case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
+case class UnitLocation(locationUnitMap: Map[Location, UnitPosition]) {
   def ownUnits(power: Power): Seq[UnitPosition] = {
     locationUnitMap.filter { case (l, g) => g.power == power }.map { case (l, g) => UnitPosition(g.power, g.unitType, l) }.toSeq
   }
@@ -114,7 +115,7 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 
   def isClear(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
 
-  def updated(unitPosition: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitPosition.location, unitPosition.gameUnit))
+  def updated(unitPosition: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitPosition.location, unitPosition))
 
   def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, gu) => l ~~ location })
 
@@ -130,16 +131,16 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
 
   def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
     orders.collect {
-      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src == l && o.gameUnit == gu } => o
-      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } && o.unitType == Fleet =>
-        locationUnitMap.find { case (l, gu) => o.src ~~ l && o.gameUnit == gu }.fold(o) { case (l, gu) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
-      case (o: NonMoveOrder) if locationUnitMap.exists { case (l, gu) => o.src ~~ l && o.gameUnit == gu } => o
+      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition == gu } => o
+      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition ~~ gu } && o.unitType == Fleet =>
+        locationUnitMap.find { case (l, gu) => o.unitPosition ~~ gu }.fold(o) { case (l, gu) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
+      case (o: NonMoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition ~~ gu } => o
     }
   }
 }
 
 case class UnitPosition(power: Power, unitType: UnitType, location: Location) {
-  def gameUnit: GameUnit = GameUnit(power, unitType)
+  def ~~(that: UnitPosition): Boolean = this.power == that.power && this.unitType == that.unitType && this.location ~~ that.location
 
   require(location.coast.isDefined)
 

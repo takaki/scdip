@@ -33,7 +33,7 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
       prePhase ~ owners ~ preSt ~ preD ~ preR ~
       os ~ postSt) =>
       val phase = prePhase.getOrElse(Phase(1901, Spring, Movement))
-      val psomap = owners.toList.flatten.foldLeft(Map.empty[Province, Power])((m, us) => m.updated(us.location.province, us.gameUnit.power))
+      val psomap = owners.toList.flatten.foldLeft(Map.empty[Province, Power])((m, up) => m.updated(up.location.province, up.power))
       val preDis = preD.toList.flatten
       val preRes = preR.toList.flatten
       if (postSt._1.isEmpty && postSt._2.isEmpty) {
@@ -88,7 +88,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
   def holdOrder: Parser[HoldOrder] = unitPosition <~ ("(?i)HOLD".r | "H") ^^ { case (u) => HoldOrder(u) }
 
   def moveOrder: Parser[MoveOrder] = (unitPosition <~ "-") ~ location ~ opt(("via" | "by") ~> "(?i)convoy".r) ^^ {
-    case (up ~ d ~ c) => MoveOrder(up, d.setDstCoast(up.gameUnit.unitType, up.location, worldMap), c.fold(false)(_ => true))
+    case (up ~ d ~ c) => MoveOrder(up, d.setDstCoast(up.unitType, up.location, worldMap), c.fold(false)(_ => true))
   }
 
   def support: Parser[String] = "(?i)SUPPORTS".r | "S"

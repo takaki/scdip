@@ -3,11 +3,9 @@ package scdip
 sealed trait Order {
   def unitPosition: UnitPosition
 
-  def gameUnit: GameUnit = unitPosition.gameUnit
+  def power: Power = unitPosition.power
 
-  def power: Power = gameUnit.power
-
-  def unitType: UnitType = gameUnit.unitType
+  def unitType: UnitType = unitPosition.unitType
 
   def src: Location = unitPosition.location
 
@@ -134,10 +132,6 @@ object UnitType {
 
   }
 
-}
-
-case class GameUnit(power: Power, unitType: UnitType) {
-  override def toString: String = s"$power: $unitType"
 }
 
 sealed trait UnitType {

@@ -713,8 +713,6 @@ trait OrderResult {
 
   def order: Order
 
-  def gameUnit: GameUnit = GameUnit(power, order.unitType)
-
   def run[T](f: Order => T): Option[T]
 
   def flatRun[T](f: Order => Option[T]): Option[T]

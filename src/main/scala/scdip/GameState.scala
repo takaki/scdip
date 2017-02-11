@@ -74,7 +74,7 @@ case class AdjustmentState(worldInfo: WorldInfo,
 
   def next(orders: Seq[Order]): MovementState = {
     val newSCI = unitLocation.unitStats.foldLeft(supplyCenterInfo) {
-      case (sc, up) => sc.updated(up.location.province, up.gameUnit.power)
+      case (sc, up) => sc.updated(up.location.province, up.power)
     }
     val newUL = orders.foldLeft(unitLocation) {
       case (ul, o: BuildOrder) if ul.count(o.power) < newSCI.count(o.power) &&
@@ -94,7 +94,7 @@ case class AdjustmentState(worldInfo: WorldInfo,
         unitLocation
       } else {
         val rm = unitLocation.ownUnits(power).sortBy { up =>
-          (up.gameUnit.unitType match {
+          (up.unitType match {
             case Fleet => 0
             case Army => 1
           }, -supplyCenterInfo.ownHomes(power).map(p => worldInfo.worldMap.distance(Location(p, Option(Coast.Land)), up.location)).min)
