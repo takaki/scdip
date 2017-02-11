@@ -102,22 +102,22 @@ case class SupplyCenterInfo(provinces: Set[Province], home: Map[Province, Power]
 }
 
 case class UnitLocation(locationUnitMap: Map[Location, UnitPosition]) {
+  override def toString: String = locationUnitMap.values.map(_.toString).mkString("; ")
+
   def ownUnits(power: Power): Seq[UnitPosition] = {
-    locationUnitMap.filter { case (l, g) => g.power == power }.map { case (l, g) => UnitPosition(g.power, g.unitType, l) }.toSeq
+    locationUnitMap.collect { case (_, g) if g.power == power => g }.toSeq
   }
+
 
   def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.power }
 
-
   def count(power: Power): Int = locationUnitMap.values.count(_.power == power)
 
-  override def toString: String = locationUnitMap.map { case (l, gu) => s"$l[$gu]" }.mkString("; ")
-
-  def isClear(location: Location): Boolean = !locationUnitMap.keys.exists(l => l ~~ location)
+  def isClear(location: Location): Boolean = !locationUnitMap.keys.exists(_ ~~ location)
 
   def updated(unitPosition: UnitPosition): UnitLocation = copy(locationUnitMap.updated(unitPosition.location, unitPosition))
 
-  def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, gu) => l ~~ location })
+  def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, _) => l ~~ location })
 
   private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
 
