@@ -50,7 +50,7 @@ case class RetreatState(worldInfo: WorldInfo,
     val newUL = orders.foldLeft(unitLocation) {
       case (ul, m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) =>
         if (orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) && !conflicts.contains(m.dst.province)) {
-          ul.updated(UnitPosition(m.dst, m.gameUnit))
+          ul.updated(UnitPosition(m.power, m.unitType, m.dst))
         } else {
           ul
         }

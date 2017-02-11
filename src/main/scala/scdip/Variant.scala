@@ -102,10 +102,10 @@ case class SupplyCenterInfo(provinces: Set[Province], home: Map[Province, Power]
 
 case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   def ownUnits(power: Power): Seq[UnitPosition] = {
-    locationUnitMap.filter { case (l, g) => g.power == power }.map { case (l, g) => UnitPosition(l, g) }.toSeq
+    locationUnitMap.filter { case (l, g) => g.power == power }.map { case (l, g) => UnitPosition(g.power, g.unitType, l) }.toSeq
   }
 
-  def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.gameUnit.power }
+  def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.power }
 
 
   def count(power: Power): Int = locationUnitMap.values.count(_.power == power)
@@ -121,11 +121,11 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
 
   def getUnits(locations: Seq[Location]): Seq[UnitPosition] = {
-    locations.flatMap(l => provinceMap.get(l.province)).map { case (loc, unit) => UnitPosition(loc, unit) }
+    locations.flatMap(l => provinceMap.get(l.province)).map { case (loc, unit) => UnitPosition(unit.power, unit.unitType, loc) }
   }
 
   def unitStats: List[UnitPosition] = {
-    locationUnitMap.toList.map { case (l, g) => UnitPosition(l, g) }
+    locationUnitMap.toList.map { case (l, g) => UnitPosition(g.power, g.unitType, l) }
   }
 
   def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
@@ -138,10 +138,12 @@ case class UnitLocation(locationUnitMap: Map[Location, GameUnit]) {
   }
 }
 
-case class UnitPosition(location: Location, gameUnit: GameUnit) {
+case class UnitPosition(power: Power, unitType: UnitType, location: Location) {
+  def gameUnit: GameUnit = GameUnit(power, unitType)
+
   require(location.coast.isDefined)
 
-  override def toString: String = s"${gameUnit.power}: ${gameUnit.unitType} $location "
+  override def toString: String = s"$power: $unitType $location "
 
 }
 

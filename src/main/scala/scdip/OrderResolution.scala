@@ -520,11 +520,11 @@ case class OrderResults(results: Seq[OrderResult],
           f.foldLeft(f.foldLeft(unitLocation) {
             case (u, m) => u.clear(m.src)
           }) {
-            case (u, m) => u.updated(UnitPosition(m.dst, m.gameUnit))
+            case (u, m) => u.updated(UnitPosition(m.power, m.unitType, m.dst))
           }
         } else {
           move(s.foldLeft(unitLocation) {
-            case (u, m) => u.clear(m.src).updated(UnitPosition(m.dst, m.gameUnit))
+            case (u, m) => u.clear(m.src).updated(UnitPosition(m.power, m.unitType, m.dst))
           }, f)
         }
       }

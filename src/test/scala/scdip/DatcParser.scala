@@ -63,7 +63,7 @@ case class DatcParser(variant: Variant) extends OrderParser with PhaseParser {
 
   def prestate: Parser[List[UnitPosition]] = "PRESTATE" ~> LF ~> rep(state)
 
-  def state: Parser[UnitPosition] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitPosition(l.setCoast(u), GameUnit(p, u)) }
+  def state: Parser[UnitPosition] = power ~ unittype ~ (location <~ rep1(LF)) ^^ { case (p ~ u ~ l) => UnitPosition(p, u, l.setCoast(u)) }
 
   def orders: Parser[List[Order]] = "ORDERS" ~> rep1(LF) ~> rep(order <~ LF)
 
@@ -83,7 +83,7 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
 
   def order: Parser[Order] = holdOrder | moveOrder | supportMoveOrder | supportHoldOrder | convoyOrder | buildOrder | removeOrder
 
-  def unitPosition: Parser[UnitPosition] = power ~ unittype ~ location ^^ { case (p ~ u ~ l) => UnitPosition(l.setCoast(u), GameUnit(p, u)) }
+  def unitPosition: Parser[UnitPosition] = power ~ unittype ~ location ^^ { case (p ~ u ~ l) => UnitPosition(p, u, l.setCoast(u)) }
 
   def holdOrder: Parser[HoldOrder] = unitPosition <~ ("(?i)HOLD".r | "H") ^^ { case (u) => HoldOrder(u) }
 
@@ -106,9 +106,9 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
     case (up ~ u ~ f ~ to) => ConvoyOrder(up, u, f, to)
   }
 
-  def buildOrder: Parser[BuildOrder] = power ~ ("Build" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => BuildOrder(UnitPosition(l.setCoast(ut), GameUnit(p, ut))) }
+  def buildOrder: Parser[BuildOrder] = power ~ ("Build" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => BuildOrder(UnitPosition(p, ut, l.setCoast(ut))) }
 
-  def removeOrder(): Parser[RemoveOrder] = power ~ ("Remove" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => RemoveOrder(UnitPosition(l.setCoast(ut), GameUnit(p, ut))) }
+  def removeOrder(): Parser[RemoveOrder] = power ~ ("Remove" ~> unittype) ~ location ^^ { case (p ~ ut ~ l) => RemoveOrder(UnitPosition(p, ut, l.setCoast(ut))) }
 
   def power: Parser[Power] = "[A-Z][a-z]+".r <~ ":" ^^ { result => variant.power(result) }
 
