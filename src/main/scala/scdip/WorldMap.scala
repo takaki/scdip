@@ -104,7 +104,7 @@ case class Location(province: Province, coast: Option[Coast]) {
   def setDstCoast(t: UnitType, src: Location, worldMap: WorldMap): Location = {
     t match {
       case Army => setCoast(t)
-      case Fleet => coast.fold(worldMap.connected(src.setCoast(t), this.province).getOrElse(this))(_ => this)
+      case Fleet => coast.fold(worldMap.findConnected(src.setCoast(t), this.province).getOrElse(this))(_ => this)
     }
   }
 
@@ -116,24 +116,26 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
 
   private val diEdges = edges.map(e => DiEdge(e._1, e._2))
   private val graph: Graph[Location, DiEdge] = Graph.from(edges = diEdges)
+
   private val distanceGraph: Graph[Location, DiEdge] = graph ++ (for {
     f <- graph.nodes
     t <- graph.nodes if f.value ~~ t.value && f != t
   } yield DiEdge(f.value, t.value)).toList
-  private val provinces = diEdges.map(de => de.from.province).distinct
 
-  private val armyProvinces: Set[Province] = diEdges.filter(de => de.from.coast.exists(_.isLand)).map(de => de.from.province).toSet
-  private val fleetProvinces: Set[Province] = diEdges.filter(de => de.from.coast.exists(_.isSea)).map(de => de.from.province).toSet
+  private val provinces: Set[Province] = graph.nodes.map(n => n.value.province).toSet
+
+  private val armyProvinces: Set[Province] = graph.nodes.filter(n=>n.value.coast.exists(_.isLand)).map(_.value.province).toSet
+  private val fleetProvinces: Set[Province] = graph.nodes.filter(n=>n.value.coast.exists(_.isSea)).map(_.value.province).toSet
 
   private val seaProvinces = fleetProvinces -- armyProvinces
-  private val landProvinces = armyProvinces -- fleetProvinces
+  //  private val landProvinces = armyProvinces -- fleetProvinces
   private val coastalProvinces = armyProvinces & fleetProvinces
 
-  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.exists(_.isLand))
-  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.exists(_.isSea))
+  //  private val armyEdges = diEdges.filter(e => armyProvinces.contains(e.from.province) && e.from.coast.exists(_.isLand))
+  //  private val fleetEdges = diEdges.filter(e => fleetProvinces.contains(e.from.province) && e.from.coast.exists(_.isSea))
 
-  private val armyGraph: Graph[Location, DiEdge] = Graph.from(edges = armyEdges)
-  private val fleetGraph: Graph[Location, DiEdge] = Graph.from(edges = fleetEdges)
+  //  private val armyGraph: Graph[Location, DiEdge] = Graph.from(edges = armyEdges)
+  //  private val fleetGraph: Graph[Location, DiEdge] = Graph.from(edges = fleetEdges)
 
   private val locationMap: Map[String, Location] = {
     graph.nodes.map(n => n.value.toString -> n.value).toMap
@@ -148,7 +150,7 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
     locationMap(Location(provinceMap(s(0)), Coast.parse(s(1))).toString)
   }
 
-  def connected(src: Location, dst: Province): Option[Location] = {
+  def findConnected(src: Location, dst: Province): Option[Location] = {
     val connected = diEdges.filter(p => p.from == src && p.to.province == dst)
     if (connected.size == 1) {
       Option(connected.head.to)

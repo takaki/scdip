@@ -5,6 +5,10 @@ import scdip.Season.{Fall, Spring}
 import scdip.UnitType.{Army, Fleet}
 
 trait GameState {
+  def worldInfo: WorldInfo
+
+  def worldMap: WorldMap = worldInfo.worldMap
+
   def phaseType: PhaseType
 
   def unitLocation: UnitLocation
@@ -22,7 +26,7 @@ case class MovementState(worldInfo: WorldInfo,
   val phaseType = PhaseType.Movement
 
   override def next(orders: Seq[Order]): RetreatState = {
-    val orderResults = OrderState(unitLocation.filterOrders(orders, worldInfo.worldMap), worldInfo.worldMap).resolve
+    val orderResults = OrderState(unitLocation.filterOrders(orders, worldMap), worldMap).resolve
     RetreatState(worldInfo, turn, orderResults.doMove(unitLocation), supplyCenterInfo, orderResults)
   }
 
@@ -36,19 +40,19 @@ case class RetreatState(worldInfo: WorldInfo,
 
   override val phaseType = PhaseType.Retreat
 
-  val dislodgeUnits: Seq[UnitPosition] = orderResults.retreatUnitPositions(worldInfo.worldMap)
+  val dislodgeUnits: Seq[UnitPosition] = orderResults.retreatUnitPositions(worldMap)
 
-  val disbandUnits: Seq[UnitPosition] = orderResults.disbandUnitPosittions(worldInfo.worldMap)
+  val disbandUnits: Seq[UnitPosition] = orderResults.disbandUnitPosittions(worldMap)
 
   override def next(orders: Seq[Order]): GameState = {
     val conflicts: Set[Province] = orders.collect {
       case (m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) &&
-        orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) => m.dst.province
+        orderResults.retreatArea(worldMap, m.unitPosition).contains(m.dst) => m.dst.province
     }.groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toSet
 
     val newUL = orders.foldLeft(unitLocation) {
       case (ul, m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) &&
-        (orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) &&
+        (orderResults.retreatArea(worldMap, m.unitPosition).contains(m.dst) &&
           !conflicts.contains(m.dst.province)) => ul.updated(UnitPosition(m.power, m.unitType, m.dst))
       case (ul, _) => ul
     }
@@ -74,7 +78,7 @@ case class AdjustmentState(worldInfo: WorldInfo,
     val newUL = orders.foldLeft(unitLocation) {
       case (ul, o: BuildOrder) if ul.count(o.power) < newSCI.count(o.power) &&
         newSCI.isHome(o.src.province, o.power) &&
-        ul.isClear(o.src) && worldInfo.worldMap.exists(o.src) &&
+        ul.isClear(o.src) && worldMap.exists(o.src) &&
         newSCI.isOwner(o.src.province, o.power)
       => ul.updated(o.unitPosition)
       case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power) &&
@@ -92,7 +96,7 @@ case class AdjustmentState(worldInfo: WorldInfo,
           (up.unitType match {
             case Fleet => 0
             case Army => 1
-          }, -supplyCenterInfo.ownHomes(power).map(p => worldInfo.worldMap.distance(Location(p, Option(Coast.Land)), up.location)).min)
+          }, -supplyCenterInfo.ownHomes(power).map(p => worldMap.distance(Location(p, Option(Coast.Land)), up.location)).min)
         }.head
         civilDisorder(power, unitLocation.clear(rm.location), supplyCenterInfo)
       }

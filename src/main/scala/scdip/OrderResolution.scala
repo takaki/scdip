@@ -497,14 +497,6 @@ case class OrderResults(results: Seq[OrderResult],
       dislodgedList.provinces.foldLeft(unitLocation) { (u, l) => u.clear(l) }
     }
 
-    def successResults: Seq[MoveOrder] = {
-      results.collect {
-        case (r: SuccessResult) => r.order
-      }.collect {
-        case (m: MoveOrder) => m
-      }
-    }
-
     @scala.annotation.tailrec
     def move(unitLocation: UnitLocation, moves: Seq[MoveOrder]): UnitLocation = {
       if (moves.isEmpty) {
@@ -516,13 +508,21 @@ case class OrderResults(results: Seq[OrderResult],
           f.foldLeft(f.foldLeft(unitLocation) {
             case (u, m) => u.clear(m.src)
           }) {
-            case (u, m) => u.updated(UnitPosition(m.power, m.unitType, m.dst))
+            case (u, m) => u.updated(m.unitPosition.copy(location = m.dst))
           }
         } else {
           move(s.foldLeft(unitLocation) {
-            case (u, m) => u.clear(m.src).updated(UnitPosition(m.power, m.unitType, m.dst))
+            case (u, m) => u.clear(m.src).updated(m.unitPosition.copy(location = m.dst))
           }, f)
         }
+      }
+    }
+
+    val successResults: Seq[MoveOrder] = {
+      results.collect {
+        case (r: SuccessResult) => r.order
+      }.collect {
+        case (m: MoveOrder) => m
       }
     }
 

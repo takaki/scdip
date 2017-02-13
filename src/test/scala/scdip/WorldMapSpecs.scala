@@ -78,7 +78,7 @@ class WorldMapSpecs extends Specification {
       val spa = worldMap.province("spa")
       val spaNc = worldMap.location("spa-nc")
 
-      worldMap.connected(gasMv, spa) must beSome(spaNc)
+      worldMap.findConnected(gasMv, spa) must beSome(spaNc)
 
     }
   }
