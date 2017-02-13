@@ -318,25 +318,21 @@ object OrderState {
       if (orders.isEmpty) {
         orderState
       } else {
-        val (_, maximum) = orders.map(o => (o, orderState.supportCount(o))).groupBy {
-          case (_, sc) => sc
-        }.maxBy {
+        orders.groupBy(o => orderState.supportCount(o)).maxBy {
           case (sc, _) => sc
-        }
-        if (maximum.size == 1) {
-          val (max, _) = maximum.head
-          if (orderState.getMark(max).exists(_.isInstanceOf[Bounce])) {
-            val os = orderState.delMark(max)
-            if (os.isDislodged(max)) {
-              os.delDislodged(max)
+        }._2 match {
+          case Seq(max) =>
+            if (orderState.getMark(max).exists(_.isInstanceOf[Bounce])) {
+              val os = orderState.delMark(max)
+              if (os.isDislodged(max)) {
+                os.delDislodged(max)
+              } else {
+                unbounce(os.delCombatList(province, max), province)
+              }
             } else {
-              unbounce(os.delCombatList(province, max), province)
+              orderState
             }
-          } else {
-            orderState
-          }
-        } else {
-          orderState
+          case _ => orderState
         }
       }
     }
@@ -628,17 +624,15 @@ case class OrderState(orders: Seq[Order],
   def supportTarget(s: SupportOrder): Option[Order] = _supportRecord.supportTarget(s)
 
   def uniqueStrongestOrder(province: Province): Option[Order] = {
-    val mos: Seq[(Order, Int)] = orders.filter {
+    orders.filter {
       case (m: MoveOrder) => m.dst ~~ province
       case (o) => o.src ~~ province
-    }.map(o => (o, _supportRecord.supportCount(o, _markRecord))).groupBy {
-      case (_, sc) => sc
-    }.maxBy {
+    }.groupBy(o => _supportRecord.supportCount(o, _markRecord)).maxBy {
       case (sc, _) => sc
-    }._2
-
-    if (mos.size == 1) Option(mos.head._1) else None
-    // TODO: case (x,List(_) => x) ???
+    }._2 match {
+      case Seq(max) => Option(max)
+      case _ => None
+    }
   }
 
   def highestSupportCount(province: Province): Int = {
