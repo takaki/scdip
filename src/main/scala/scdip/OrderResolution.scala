@@ -341,20 +341,20 @@ object OrderState {
       }
     }
 
-    val dislodgedPairs: Seq[(MoveOrder, Order)] = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
-      case (o: NonMoveOrder) if m.dst ~~ o.src => true
-      case (o: MoveOrder) if !orderState.notMarked(o) && m.dst ~~ o.src => true
-      case _ => false
-    }.map(o => (m, o)))
-
     def makeDislodged(orderState: OrderState, dp: Seq[(MoveOrder, Order)]): OrderState = {
-      dislodgedPairs.foldLeft(orderState) {
+      dp.foldLeft(orderState) {
         case (os, (m, o: MoveOrder)) if !os.isConvoyTarget(m) && !os.isConvoyTarget(o) && m.src ~~ o.dst =>
           os.delCombatList(o).addDislodged(o, m)
         case (os, (m, o)) if os.isConvoyTarget(m) => os.addDislodged(o)
         case (os, (m, o)) => os.addDislodged(o, m)
       }
     }
+
+    val dislodgedPairs: Seq[(MoveOrder, Order)] = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
+      case (o: NonMoveOrder) if m.dst ~~ o.src => true
+      case (o: MoveOrder) if !orderState.notMarked(o) && m.dst ~~ o.src => true
+      case _ => false
+    }.map(o => (m, o)))
 
     dislodgedPairs.foldLeft(makeDislodged(orderState, dislodgedPairs)) {
       case (os, (m, _)) => unbounce(os, m.src.province)
@@ -636,6 +636,7 @@ case class OrderState(orders: Seq[Order],
     }.maxBy {
       case (sc, _) => sc
     }._2
+
     if (mos.size == 1) Option(mos.head._1) else None
     // TODO: case (x,List(_) => x) ???
   }

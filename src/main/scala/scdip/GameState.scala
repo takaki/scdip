@@ -28,7 +28,6 @@ case class MovementState(worldInfo: WorldInfo,
 
 }
 
-// TODO: dislodged and disrupted
 case class RetreatState(worldInfo: WorldInfo,
                         turn: Turn,
                         unitLocation: UnitLocation,
@@ -48,14 +47,10 @@ case class RetreatState(worldInfo: WorldInfo,
     }.groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toSet
 
     val newUL = orders.foldLeft(unitLocation) {
-      case (ul, m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) =>
-        if (orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) && !conflicts.contains(m.dst.province)) {
-          ul.updated(UnitPosition(m.power, m.unitType, m.dst))
-        } else {
-          ul
-        }
-      case (ul, o) if dislodgeUnits.contains(o.unitPosition) => ul
-      case (ul, o) => ul
+      case (ul, m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) &&
+        (orderResults.retreatArea(worldInfo.worldMap, m.unitPosition).contains(m.dst) &&
+          !conflicts.contains(m.dst.province)) => ul.updated(UnitPosition(m.power, m.unitType, m.dst))
+      case (ul, _) => ul
     }
 
     turn.season match {
@@ -73,7 +68,7 @@ case class AdjustmentState(worldInfo: WorldInfo,
   override val phaseType = PhaseType.Adjustment
 
   def next(orders: Seq[Order]): MovementState = {
-    val newSCI = unitLocation.unitStats.foldLeft(supplyCenterInfo) {
+    val newSCI = unitLocation.units.foldLeft(supplyCenterInfo) {
       case (sc, up) => sc.updated(up.location.province, up.power)
     }
     val newUL = orders.foldLeft(unitLocation) {

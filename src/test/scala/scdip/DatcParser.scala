@@ -101,7 +101,6 @@ trait OrderParser extends UnitTypeParser with RegexParsers {
     case (up ~ u ~ f ~ to) => SupportMoveOrder(up, u, f, to)
   }
 
-  // TODO: via convoy?
   def convoyOrder: Parser[ConvoyOrder] = (unitPosition <~ ("(?i)convoys".r | "C" | "c")) ~ unittype ~ (location <~ "-") ~ location ^^ {
     case (up ~ u ~ f ~ to) => ConvoyOrder(up, u, f, to)
   }

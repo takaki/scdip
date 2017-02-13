@@ -85,7 +85,7 @@ case class Datc(variant: Variant,
       val iniState = variant.movementState
       val movementState = iniState.copy(turn = phase.turn, unitLocation = preState.foldLeft(iniState.unitLocation)((ul, us) => ul.updated(us)))
       val retreatState = movementState.next(orders)
-      Seq(("POSTSTATE", () => retreatState.unitLocation.unitStats.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
+      Seq(("POSTSTATE", () => retreatState.unitLocation.units.sortBy(_.location.toString) === postState.sortBy(_.location.toString)),
         ("POSTSTATE_DISLODGED", () => retreatState.dislodgeUnits.toSet === dislodged.toSet))
     } else {
       if (phase.phaseType == Retreat) {
@@ -94,7 +94,7 @@ case class Datc(variant: Variant,
         val movementState = iniState.copy(turn = phase.turn, unitLocation = movementOrders.foldLeft(iniState.unitLocation)((ul, mo) => ul.updated(mo.unitPosition)))
         val retreatState = movementState.next(preStateResult.map(_.order))
         val nextState = retreatState.next(orders)
-        Seq(("POSTSTATE", () => nextState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
+        Seq(("POSTSTATE", () => nextState.unitLocation.units.sortBy(_.toString) === postState.sortBy(_.toString)))
       } else {
         val iniState = variant.movementState
         val adjustmentState = AdjustmentState(iniState.worldInfo,
@@ -102,7 +102,7 @@ case class Datc(variant: Variant,
           preState.foldLeft(iniState.unitLocation)((ul, up) => ul.updated(up)),
           supplyCenterOwner.foldLeft(iniState.supplyCenterInfo.copy(owner = Map.empty)) { case (sc, (pr, pw)) => sc.updated(pr, pw) })
         val movementState = adjustmentState.next(orders)
-        Seq(("POSTSTATE", () => movementState.unitLocation.unitStats.sortBy(_.toString) === postState.sortBy(_.toString)))
+        Seq(("POSTSTATE", () => movementState.unitLocation.units.sortBy(_.toString) === postState.sortBy(_.toString)))
       }
     }
   }

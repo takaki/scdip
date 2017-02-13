@@ -109,7 +109,7 @@ case class UnitLocation(locationUnitMap: Map[Location, UnitPosition]) {
   }
 
 
-  def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (l, g) => l ~~ unitPosition.location && g.power == unitPosition.power }
+  def exists(unitPosition: UnitPosition): Boolean = locationUnitMap.exists { case (_, g) => g == unitPosition }
 
   def count(power: Power): Int = locationUnitMap.values.count(_.power == power)
 
@@ -119,22 +119,16 @@ case class UnitLocation(locationUnitMap: Map[Location, UnitPosition]) {
 
   def clear(location: Location): UnitLocation = copy(locationUnitMap = locationUnitMap.filterNot { case (l, _) => l ~~ location })
 
-  private val provinceMap = locationUnitMap.map { case (loc, unit) => (loc.province, (loc, unit)) }
-
-  def getUnits(locations: Seq[Location]): Seq[UnitPosition] = {
-    locations.flatMap(l => provinceMap.get(l.province)).map { case (loc, unit) => UnitPosition(unit.power, unit.unitType, loc) }
-  }
-
-  def unitStats: List[UnitPosition] = {
-    locationUnitMap.toList.map { case (l, g) => UnitPosition(g.power, g.unitType, l) }
-  }
+  def units: List[UnitPosition] = locationUnitMap.values.toList
 
   def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
     orders.collect {
-      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition == gu } => o
-      case (o: MoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition ~~ gu } && o.unitType == Fleet =>
-        locationUnitMap.find { case (l, gu) => o.unitPosition ~~ gu }.fold(o) { case (l, gu) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap)) } // 6.B.10
-      case (o: NonMoveOrder) if locationUnitMap.exists { case (l, gu) => o.unitPosition ~~ gu } => o
+      case (o: NonMoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } => o
+      case (o: MoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition == up } => o
+      case (o: MoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } && o.unitType == Fleet =>
+        locationUnitMap.find { case (_, up) => o.unitPosition ~~ up }.fold(o) {
+          case (l, _) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap))
+        } // 6.B.10
     }
   }
 }
