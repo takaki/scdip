@@ -167,7 +167,7 @@ case class WorldMap(provinceMap: Map[String, Province], edges: Seq[(Location, Lo
   }
 
   def isReachable(src: Location, dst: Location): Boolean = {
-    diEdges.exists(de => de.from == src && de.to ~~ dst)
+    graph.edges.exists(e=> e.from == src && e.to ~~ dst)
   }
 
   def canConvoy(from: Province, to: Province, convoys: Set[Province] = seaProvinces): Boolean = {

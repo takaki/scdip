@@ -192,6 +192,18 @@ object Phase extends PhaseParser {
   }
 }
 
+object PhaseType {
+
+  case object Movement extends PhaseType
+
+  case object Retreat extends PhaseType
+
+  case object Adjustment extends PhaseType
+
+}
+
+trait PhaseType
+
 trait PhaseParser extends RegexParsers {
   def phase: Parser[Phase] = season ~ (year <~ opt(",")) ~ (opt("(") ~> phasetype <~ opt(")")) ^^ { case (s ~ y ~ pt) => Phase(y, s, pt) }
 

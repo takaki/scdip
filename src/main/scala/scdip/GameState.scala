@@ -9,8 +9,6 @@ trait GameState {
 
   def worldMap: WorldMap = worldInfo.worldMap
 
-  def phaseType: PhaseType
-
   def unitLocation: UnitLocation
 
   def next(orders: Seq[Order]): GameState
@@ -23,8 +21,6 @@ case class MovementState(worldInfo: WorldInfo,
                          unitLocation: UnitLocation,
                          supplyCenterInfo: SupplyCenterInfo
                         ) extends GameState {
-  val phaseType = PhaseType.Movement
-
   override def next(orders: Seq[Order]): RetreatState = {
     val orderResults = OrderState(unitLocation.filterOrders(orders, worldMap), worldMap).resolve
     RetreatState(worldInfo, turn, orderResults.doMove(unitLocation), supplyCenterInfo, orderResults)
@@ -37,8 +33,6 @@ case class RetreatState(worldInfo: WorldInfo,
                         unitLocation: UnitLocation,
                         supplyCenterInfo: SupplyCenterInfo,
                         orderResults: OrderResults) extends GameState {
-
-  override val phaseType = PhaseType.Retreat
 
   val dislodgeUnits: Seq[UnitPosition] = orderResults.retreatUnitPositions(worldMap)
 
@@ -69,24 +63,8 @@ case class AdjustmentState(worldInfo: WorldInfo,
                            turn: Turn,
                            unitLocation: UnitLocation,
                            supplyCenterInfo: SupplyCenterInfo) extends GameState {
-  override val phaseType = PhaseType.Adjustment
 
   def next(orders: Seq[Order]): MovementState = {
-    val newSCI = unitLocation.units.foldLeft(supplyCenterInfo) {
-      case (sc, up) => sc.updated(up.location.province, up.power)
-    }
-    val newUL = orders.foldLeft(unitLocation) {
-      case (ul, o: BuildOrder) if ul.count(o.power) < newSCI.count(o.power) &&
-        newSCI.isHome(o.src.province, o.power) &&
-        ul.isClear(o.src) && worldMap.exists(o.src) &&
-        newSCI.isOwner(o.src.province, o.power)
-      => ul.updated(o.unitPosition)
-      case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power) &&
-        ul.exists(o.unitPosition)
-      => ul.clear(o.src)
-      case (ul, _) => ul
-    }
-
     @scala.annotation.tailrec
     def civilDisorder(power: Power, unitLocation: UnitLocation, supplyCenterInfo: SupplyCenterInfo): UnitLocation = {
       if (unitLocation.count(power) <= supplyCenterInfo.count(power)) {
@@ -102,18 +80,23 @@ case class AdjustmentState(worldInfo: WorldInfo,
       }
     }
 
+    val newSCI = unitLocation.units.foldLeft(supplyCenterInfo) {
+      case (sc, up) => sc.updated(up.location.province, up.power)
+    }
+
+    val newUL = orders.foldLeft(unitLocation) {
+      case (ul, o: BuildOrder) if ul.count(o.power) < newSCI.count(o.power) &&
+        newSCI.isHome(o.src.province, o.power) &&
+        ul.isClear(o.src) && worldMap.exists(o.src) &&
+        newSCI.isOwner(o.src.province, o.power)
+      => ul.updated(o.unitPosition)
+      case (ul, o: RemoveOrder) if ul.count(o.power) > newSCI.count(o.power) &&
+        ul.exists(o.unitPosition)
+      => ul.clear(o.src)
+      case (ul, _) => ul
+    }
+
     MovementState(worldInfo, turn.next, worldInfo.powers.foldLeft(newUL) { case (ul, p) => civilDisorder(p, ul, newSCI) }, newSCI)
   }
 }
 
-object PhaseType {
-
-  case object Movement extends PhaseType
-
-  case object Retreat extends PhaseType
-
-  case object Adjustment extends PhaseType
-
-}
-
-trait PhaseType
