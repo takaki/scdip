@@ -49,7 +49,7 @@ object OrderState {
       orderState.convoyGroups.foldLeft(orderState) {
         case (os, (m, _)) if !os.worldMap.canConvoy(m.src.province, m.dst.province) => os.setMark(m, VoidMark("no path")).delConvoy(m)
         case (os, (m, cs)) => if (os.worldMap.canConvoy(m.src.province, m.dst.province, orderState.orders.collect {
-          case (o) if o.unitType == Fleet => o.src.province
+          case o if o.unitType == Fleet => o.src.province
         }.toSet)) {
           if (os.worldMap.canConvoy(m.src.province, m.dst.province, cs.map(_.src.province))) {
             os
@@ -86,13 +86,13 @@ object OrderState {
       orderState.supports.filter(orderState.notMarked(_)).foldLeft(orderState) {
         case (os, s: SupportHoldOrder) =>
           s.findSupportTarget(os.orders).fold(os.setMark(s, VoidMark("no support target(sh)"))) {
-            case (nm: NonMoveOrder) => os.addSupport(nm, s)
-            case (m: MoveOrder) if os.getMark(m).exists(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
+            case nm: NonMoveOrder => os.addSupport(nm, s)
+            case m: MoveOrder if os.getMark(m).exists(_.isInstanceOf[VoidMark]) => os.addSupport(m, s)
             case _ => os
           }
         case (os, s: SupportMoveOrder) =>
           s.findSupportTarget(os.orders.filter(o => os.notMarked(o))).fold(os.setMark(s, VoidMark("no support target(sm)"))) {
-            case (m: MoveOrder) => if (os.orders.exists(o => o.src ~~ m.dst && o.power == s.power)) {
+            case m: MoveOrder => if (os.orders.exists(o => o.src ~~ m.dst && o.power == s.power)) {
               os.addSupport(m, s).addNoHelpList(m, s)
             } else {
               os.addSupport(m, s)
@@ -115,7 +115,7 @@ object OrderState {
     }
   }
 
-  private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: ((OrderState) => OrderState) = identity, inStep9: Boolean = false): OrderState = {
+  private def cutSupport(orderState: OrderState, moveOrder: MoveOrder, message: String, after: OrderState => OrderState = identity, inStep9: Boolean = false): OrderState = {
     def isInvalidSupport(os: OrderState, s: SupportOrder): Boolean = {
       os.getMark(s).exists(m => m.isInstanceOf[CutMark] || m.isInstanceOf[VoidMark])
     }
@@ -125,9 +125,9 @@ object OrderState {
         isInvalidSupport(orderState, s) ||
           s.power == moveOrder.power ||
           (orderState.isConvoyTarget(moveOrder) && orderState.supportTarget(s).exists {
-            case (c: ConvoyOrder) if !orderState.getMark(c).exists(_.isInstanceOf[VoidMark]) =>
+            case c: ConvoyOrder if !orderState.getMark(c).exists(_.isInstanceOf[VoidMark]) =>
               orderState.convoyFleets(moveOrder).forall(c0 => orderState.isParadox(c, c0))
-            case (supportedMove: MoveOrder) =>
+            case supportedMove: MoveOrder =>
               (for {
                 c <- orderState.convoys if c.src ~~ supportedMove.dst && !orderState.getMark(c).exists(_.isInstanceOf[VoidMark])
                 c0 <- orderState.convoyFleets(moveOrder)
@@ -137,7 +137,7 @@ object OrderState {
             case _ => false
           }) ||
           (!inStep9 && orderState.supportTarget(s).exists {
-            case (m: MoveOrder) => m.dst ~~ moveOrder.src
+            case m: MoveOrder => m.dst ~~ moveOrder.src
             case _ => false
           }))
       .foldLeft(orderState) {
@@ -257,12 +257,12 @@ object OrderState {
   private def step7(orderState: OrderState): OrderState = {
     val bounced = orderState.combatListSeq.flatMap {
       case (p, cos) => cos.collect {
-        case (m: MoveOrder) if orderState.notMarked(m) => m
+        case m: MoveOrder if orderState.notMarked(m) => m
       }.filter(m =>
         cos.filter(o => o != m).exists {
-          case (o: MoveOrder) if orderState.getMark(o).exists(_.isInstanceOf[Bounce]) && o.src ~~ p => 0 >= orderState.supportCount(m)
-          case (sh: SupportHoldOrder) if orderState.supportTarget(sh).exists(s => orderState.convoyFleets(m).contains(s)) => orderState.delSupport(sh).uniqueStrongestOrder(sh.targetSrc.province).isDefined // F.18
-          case (o) => orderState.supportCount(o) >= orderState.supportCount(m)
+          case o: MoveOrder if orderState.getMark(o).exists(_.isInstanceOf[Bounce]) && o.src ~~ p => 0 >= orderState.supportCount(m)
+          case sh: SupportHoldOrder if orderState.supportTarget(sh).exists(s => orderState.convoyFleets(m).contains(s)) => orderState.delSupport(sh).uniqueStrongestOrder(sh.targetSrc.province).isDefined // F.18
+          case o => orderState.supportCount(o) >= orderState.supportCount(m)
         }
       )
     }
@@ -282,7 +282,7 @@ object OrderState {
       case (p, cos) =>
         val highest: Int = orderState.highestSupportCount(p)
         val highestOrders = cos.collect {
-          case (m: MoveOrder) if orderState.supportCount(m) == highest => m
+          case m: MoveOrder if orderState.supportCount(m) == highest => m
         }
         if (highestOrders.size == 1) {
           highestOrders.filter(orderState.notMarked)
@@ -291,7 +291,7 @@ object OrderState {
         }
     }.foldLeft(orderState) {
       case (os, m) => os.orders.find(h => h.src ~~ m.dst).fold(os) {
-        case (o: MoveOrder) if orderState.notMarked(o) => os
+        case o: MoveOrder if orderState.notMarked(o) => os
         case nm if nm.power == m.power => step6to8(bounce(os, m, "step8 self-attack"))
         case _ => if (os.supportCountNH(m) > os.combatOrders(m.dst.province).collect {
           case o if o != m => os.supportCount(o)
@@ -347,8 +347,8 @@ object OrderState {
     }
 
     val dislodgedPairs: Seq[(MoveOrder, Order)] = orderState.moves.filter(orderState.notMarked).flatMap(m => orderState.orders.find {
-      case (o: NonMoveOrder) if m.dst ~~ o.src => true
-      case (o: MoveOrder) if !orderState.notMarked(o) && m.dst ~~ o.src => true
+      case o: NonMoveOrder if m.dst ~~ o.src => true
+      case o: MoveOrder if !orderState.notMarked(o) && m.dst ~~ o.src => true
       case _ => false
     }.map(o => (m, o)))
 
@@ -377,8 +377,8 @@ object OrderState {
     }
 
     def delSupport(supportOrder: SupportOrder): SupportRecord = supportOrder match {
-      case (s: SupportHoldOrder) => copy(_holdCount = _holdCount - s)
-      case (s: SupportMoveOrder) => copy(_moveCount = _moveCount - s)
+      case s: SupportHoldOrder => copy(_holdCount = _holdCount - s)
+      case s: SupportMoveOrder => copy(_moveCount = _moveCount - s)
     }
 
     def delSupportTarget(m: MoveOrder): SupportRecord = {
@@ -386,15 +386,15 @@ object OrderState {
     }
 
     def supportTarget(supportOrder: SupportOrder): Option[Order] = supportOrder match {
-      case (s: SupportHoldOrder) => _holdCount.get(s)
-      case (s: SupportMoveOrder) => _moveCount.get(s)
+      case s: SupportHoldOrder => _holdCount.get(s)
+      case s: SupportMoveOrder => _moveCount.get(s)
     }
 
     def supportCount(order: Order, markRecord: MarkRecord): Int = order match {
-      case (_: NonMoveOrder) => _holdCount.count { case (_, v) => v == order }
-      case (_: MoveOrder) if markRecord.getMark(order).exists(_.isInstanceOf[VoidMark]) => _holdCount.count { case (_, v) => v == order }
-      case (_: MoveOrder) if markRecord.getMark(order).exists(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (_, v) => v == order }
-      case (_: MoveOrder) => _moveCount.count { case (_, v) => v == order }
+      case _: NonMoveOrder => _holdCount.count { case (_, v) => v == order }
+      case _: MoveOrder if markRecord.getMark(order).exists(_.isInstanceOf[VoidMark]) => _holdCount.count { case (_, v) => v == order }
+      case _: MoveOrder if markRecord.getMark(order).exists(_.isInstanceOf[NoConvoy]) => _holdCount.count { case (_, v) => v == order }
+      case _: MoveOrder => _moveCount.count { case (_, v) => v == order }
     }
 
 
@@ -520,9 +520,9 @@ case class OrderResults(results: Seq[OrderResult],
 
     val successResults: Seq[MoveOrder] = {
       results.collect {
-        case (r: SuccessResult) => r.order
+        case r: SuccessResult => r.order
       }.collect {
-        case (m: MoveOrder) => m
+        case m: MoveOrder => m
       }
     }
 
@@ -581,7 +581,7 @@ case class OrderState(orders: Seq[Order],
 
   def moves: Seq[MoveOrder] = orders.collect { case o: MoveOrder => o }
 
-  def foldMoves(f: (OrderState, MoveOrder) => OrderState, modifier: (Seq[MoveOrder] => Seq[MoveOrder]) = identity): OrderState = modifier(moves).foldLeft(this)(f)
+  def foldMoves(f: (OrderState, MoveOrder) => OrderState, modifier: Seq[MoveOrder] => Seq[MoveOrder] = identity): OrderState = modifier(moves).foldLeft(this)(f)
 
   def holds: Seq[HoldOrder] = orders.collect { case o: HoldOrder => o }
 
@@ -625,8 +625,8 @@ case class OrderState(orders: Seq[Order],
 
   def uniqueStrongestOrder(province: Province): Option[Order] = {
     orders.filter {
-      case (m: MoveOrder) => m.dst ~~ province
-      case (o) => o.src ~~ province
+      case m: MoveOrder => m.dst ~~ province
+      case o => o.src ~~ province
     }.groupBy(o => _supportRecord.supportCount(o, _markRecord)).maxBy {
       case (sc, _) => sc
     }._2 match {
@@ -652,7 +652,7 @@ case class OrderState(orders: Seq[Order],
 
   def addConvoys(m: MoveOrder, convoys: Seq[ConvoyOrder]): OrderState = {
     convoys.foldLeft(addConvoyMove(m)) {
-      case (os, (c)) => os.addConvoy(c, m)
+      case (os, c) => os.addConvoy(c, m)
     }
   }
 
@@ -716,17 +716,17 @@ trait OrderResult {
 }
 
 case class SuccessResult(order: Order) extends OrderResult {
-  override def run[T](f: (Order) => T): Option[T] = Option(f(order))
+  override def run[T](f: Order => T): Option[T] = Option(f(order))
 
-  override def flatRun[T](f: (Order) => Option[T]): Option[T] = f(order)
+  override def flatRun[T](f: Order => Option[T]): Option[T] = f(order)
 
   def mark = None
 }
 
 case class FailureResult(order: Order, mark: Option[OrderMark] = None) extends OrderResult {
-  override def run[T](f: (Order) => T): Option[T] = None
+  override def run[T](f: Order => T): Option[T] = None
 
-  override def flatRun[T](f: (Order) => Option[T]): Option[T] = None
+  override def flatRun[T](f: Order => Option[T]): Option[T] = None
 }
 
 object OrderMark {

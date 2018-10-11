@@ -24,7 +24,7 @@ case class VariantList(root: Elem) {
     val powerMap: Map[String, Power] = TreeMap.empty[String, Power](Ordering.by(_.toLowerCase)) ++ (variantElem \ "POWER").map { elem =>
       (Power(elem \@ "name", (elem \@ "active").toBoolean, elem \@ "adjective"), Option(elem \@ "altnames").filter(_.nonEmpty))
     }.flatMap {
-      case ((p, alt)) => Seq(p.name -> p) ++ alt.map(_ -> p)
+      case (p, alt) => Seq(p.name -> p) ++ alt.map(_ -> p)
     }
 
     Variant(variantElem \@ "name",
@@ -59,12 +59,12 @@ case class Variant(name: String,
   def power(name: String): Power = powerMap(name)
 
   def movementState: MovementState = {
-    val provinces: Set[Province] = supplyCenterInfo.map { case (province, homepower, _) => worldMap.province(province) }.toSet
+    val provinces: Set[Province] = supplyCenterInfo.map { case (province, _, _) => worldMap.province(province) }.toSet
     val home = supplyCenterInfo.collect { case (province, homepower, _) if homepower != "none" =>
       worldMap.province(province) -> power(homepower)
     }.toMap
-    val owner = supplyCenterInfo.collect { case (province, _, owner) if owner != "none" =>
-      worldMap.province(province) -> power(owner)
+    val owner = supplyCenterInfo.collect { case (province, _, owner_) if owner_ != "none" =>
+      worldMap.province(province) -> power(owner_)
     }.toMap
 
     val map = initialState.map(d => {
@@ -123,9 +123,9 @@ case class UnitLocation(locationUnitMap: Map[Location, UnitPosition]) {
 
   def filterOrders(orders: Seq[Order], worldMap: WorldMap): Seq[Order] = {
     orders.collect {
-      case (o: NonMoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } => o
-      case (o: MoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition == up } => o
-      case (o: MoveOrder) if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } && o.unitType == Fleet =>
+      case o: NonMoveOrder if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } => o
+      case o: MoveOrder if locationUnitMap.exists { case (_, up) => o.unitPosition == up } => o
+      case o: MoveOrder if locationUnitMap.exists { case (_, up) => o.unitPosition ~~ up } && o.unitType == Fleet =>
         locationUnitMap.find { case (_, up) => o.unitPosition ~~ up }.fold(o) {
           case (l, _) => o.copy(unitPosition = o.unitPosition.copy(location = l), dst = o.dst.setDstCoast(o.unitType, l, worldMap))
         } // 6.B.10
@@ -187,7 +187,7 @@ case class Phase(year: Int, season: Season, phaseType: PhaseType) {
 
 object Phase extends PhaseParser {
   def parse(input: String): Phase = parseAll(phase, input) match {
-    case Success(data, next) => data
+    case Success(data, _) => data
     case NoSuccess(errorMessage, next) => throw new RuntimeException(s"$errorMessage on line ${next.pos.line} on column ${next.pos.column}")
   }
 }
@@ -205,7 +205,7 @@ object PhaseType {
 trait PhaseType
 
 trait PhaseParser extends RegexParsers {
-  def phase: Parser[Phase] = season ~ (year <~ opt(",")) ~ (opt("(") ~> phasetype <~ opt(")")) ^^ { case (s ~ y ~ pt) => Phase(y, s, pt) }
+  def phase: Parser[Phase] = season ~ (year <~ opt(",")) ~ (opt("(") ~> phasetype <~ opt(")")) ^^ { case s ~ y ~ pt => Phase(y, s, pt) }
 
   def season: Parser[Season] = (spring | fall) <~ opt(",")
 

@@ -40,7 +40,7 @@ case class RetreatState(worldInfo: WorldInfo,
 
   override def next(orders: Seq[Order]): GameState = {
     val conflicts: Set[Province] = orders.collect {
-      case (m: MoveOrder) if dislodgeUnits.contains(m.unitPosition) &&
+      case m: MoveOrder if dislodgeUnits.contains(m.unitPosition) &&
         orderResults.retreatArea(worldMap, m.unitPosition).contains(m.dst) => m.dst.province
     }.groupBy(identity).collect { case (x, List(_, _, _*)) => x }.toSet
 
@@ -70,12 +70,12 @@ case class AdjustmentState(worldInfo: WorldInfo,
       if (unitLocation.count(power) <= supplyCenterInfo.count(power)) {
         unitLocation
       } else {
-        val rm = unitLocation.ownUnits(power).sortBy { up =>
+        val rm = unitLocation.ownUnits(power).minBy { up =>
           (up.unitType match {
             case Fleet => 0
             case Army => 1
           }, -supplyCenterInfo.ownHomes(power).map(p => worldMap.distance(Location(p, Option(Coast.Land)), up.location)).min)
-        }.head
+        }
         civilDisorder(power, unitLocation.clear(rm.location), supplyCenterInfo)
       }
     }
